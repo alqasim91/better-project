@@ -3,90 +3,35 @@ import { useParams, useNavigate } from 'react-router-dom';
 import GanttChart from './GanttChart';
 import { fetchProject } from '../api';
 
-const RISK_COLOR = {
-  High: { bg: '#fef2f2', border: '#fca5a5', text: '#b91c1c' },
-  Medium: { bg: '#fffbeb', border: '#fcd34d', text: '#92400e' },
-  Low: { bg: '#f0fdf4', border: '#86efac', text: '#166534' },
-};
-
-function StatCard({ label, value }) {
-  return (
-    <div className="stat-card">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
-  );
+function Badge({ children, variant = 'default' }) {
+  return <span className={`status-badge status-badge--${variant}`}>{children}</span>;
 }
 
-function SectionPanel({ title, content, icon }) {
-  if (!content) return null;
+function Section({ number, title, children }) {
   return (
-    <div className="section-panel">
-      <div className="section-panel-header">
-        <span className="section-panel-icon">{icon}</span>
-        <h3>{title}</h3>
+    <div className="charter-section">
+      <div className="charter-section-heading">
+        <span className="charter-section-num">{number}</span>
+        <h2>{title}</h2>
       </div>
-      <p>{content}</p>
+      <div className="charter-section-body">{children}</div>
     </div>
   );
 }
 
-function RiskMatrix({ risks }) {
-  if (!risks?.length) return null;
+function CharterTable({ headers, rows }) {
   return (
-    <div className="charter-block">
-      <h2>Risk Assessment</h2>
-      <div className="risk-grid">
-        {risks.map((r, i) => {
-          const color = RISK_COLOR[r.likelihood] || RISK_COLOR.Medium;
-          return (
-            <div key={i} className="risk-card" style={{ borderColor: color.border, background: color.bg }}>
-              <div className="risk-card-header">
-                <strong>{r.title}</strong>
-                <div className="risk-badges">
-                  <span className="risk-badge" style={{ color: color.text, borderColor: color.border }}>
-                    {r.likelihood} likelihood
-                  </span>
-                  <span className="risk-badge" style={{ color: color.text, borderColor: color.border }}>
-                    {r.impact} impact
-                  </span>
-                </div>
-              </div>
-              <p>{r.description}</p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function KPISection({ kpis }) {
-  if (!kpis?.length) return null;
-  return (
-    <div className="charter-block">
-      <h2>Key Performance Indicators</h2>
-      <div className="kpi-list">
-        {kpis.map((kpi, i) => (
-          <div key={i} className="kpi-pill">
-            <span className="kpi-index">{i + 1}</span>
-            {kpi}
-          </div>
+    <table className="charter-table">
+      <thead>
+        <tr>{headers.map(h => <th key={h}>{h}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i}>{row.map((cell, j) => <td key={j}>{cell || '—'}</td>)}</tr>
         ))}
-      </div>
-    </div>
+      </tbody>
+    </table>
   );
-}
-
-function totalDuration(phases) {
-  const valid = phases.filter((p) => p.startDate && p.endDate);
-  if (!valid.length) return null;
-  const starts = valid.map((p) => new Date(p.startDate));
-  const ends = valid.map((p) => new Date(p.endDate));
-  const min = new Date(Math.min(...starts));
-  const max = new Date(Math.max(...ends));
-  const days = Math.round((max - min) / 86400000);
-  return days > 0 ? days : null;
 }
 
 export default function ProjectDashboard() {
@@ -99,8 +44,7 @@ export default function ProjectDashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchProject(id);
-        setProject(data);
+        setProject(await fetchProject(id));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -110,105 +54,155 @@ export default function ProjectDashboard() {
     load();
   }, [id]);
 
-  if (loading) return <div className="loading">Loading project...</div>;
-  if (error)
-    return (
-      <div className="error-state">
-        <h2>Error</h2>
-        <p>{error}</p>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>Back to Home</button>
-      </div>
-    );
+  if (loading) return <div className="loading">Generating your project charter...</div>;
+  if (error) return (
+    <div className="error-state">
+      <h2>Error</h2><p>{error}</p>
+      <button className="btn btn-primary" onClick={() => navigate('/')}>Back to Home</button>
+    </div>
+  );
 
-  const { enhanced, phases = [], resources = [] } = project;
-  const duration = totalDuration(phases);
-  const kpis = enhanced?.kpis || [];
+  const e = project.enhanced || {};
+  const phases = project.phases || [];
+  const team = project.team || [];
+  const risks = e.risks?.length ? e.risks : (project.risks || []);
+  const deliverables = e.deliverables?.length ? e.deliverables : (project.deliverables || []);
+  const outOfScope = e.outOfScope?.length ? e.outOfScope : (project.outOfScope || []);
+  const approvals = project.approvals || [];
+
+  // Build Gantt-compatible phases from the new schema
+  const ganttPhases = phases
+    .filter(p => p.phase && p.startDate && p.endDate)
+    .map(p => ({ name: p.phase, startDate: p.startDate, endDate: p.endDate }));
 
   return (
-    <div>
-      {/* Toolbar — hidden when printing */}
+    <div className="charter-page">
+      {/* Toolbar */}
       <div className="dashboard-toolbar no-print">
         <button className="btn btn-secondary" onClick={() => navigate('/')}>← Back</button>
         <button className="btn btn-export" onClick={() => window.print()}>Export as PDF</button>
       </div>
 
-      {/* Charter document — this is what prints */}
-      <div className="dashboard" id="charter-export">
+      {/* Charter document */}
+      <div className="charter-doc" id="charter-export">
 
-        {/* Header */}
-        <div className="charter-header">
-          <div className="charter-badge">Project Charter</div>
-          <h1>{project.name}</h1>
-          {(enhanced?.executiveSummary || project.description) && (
-            <p className="executive-summary">
-              {enhanced?.executiveSummary || project.description}
-            </p>
+        {/* Cover header */}
+        <div className="charter-cover">
+          <div className="charter-cover-label">Project Charter</div>
+          <h1 className="charter-cover-title">{project.name}</h1>
+          {e.executiveSummary && (
+            <p className="charter-cover-summary">{e.executiveSummary}</p>
           )}
-          <div className="charter-meta">
-            <span>{new Date(project.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-            {phases.length > 0 && <span>{phases.length} phase{phases.length !== 1 ? 's' : ''}</span>}
-            {resources.length > 0 && <span>{resources.length} team member{resources.length !== 1 ? 's' : ''}</span>}
-          </div>
+          <table className="charter-meta-table">
+            <tbody>
+              {project.projectManager && <tr><td>Project Manager</td><td><strong>{project.projectManager}</strong></td></tr>}
+              {project.sponsor && <tr><td>Sponsor</td><td><strong>{project.sponsor}</strong></td></tr>}
+              {project.startDate && <tr><td>Start Date</td><td>{project.startDate}</td></tr>}
+              {project.endDate && <tr><td>Target End Date</td><td>{project.endDate}</td></tr>}
+              <tr>
+                <td>Status</td>
+                <td>
+                  <Badge variant={project.status === 'Approved' ? 'approved' : 'draft'}>
+                    {project.status || 'Draft'}
+                  </Badge>
+                </td>
+              </tr>
+              <tr><td>Created</td><td>{new Date(project.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>
+            </tbody>
+          </table>
         </div>
 
-        {/* Stats bar */}
-        {(duration || phases.length || resources.length || kpis.length) ? (
-          <div className="stats-bar">
-            {duration && <StatCard label="Total Duration" value={`${duration} days`} />}
-            {phases.length > 0 && <StatCard label="Phases" value={phases.length} />}
-            {resources.length > 0 && <StatCard label="Team Size" value={resources.length} />}
-            {kpis.length > 0 && <StatCard label="KPIs Defined" value={kpis.length} />}
-          </div>
-        ) : null}
+        <hr className="charter-divider" />
 
-        {/* Timeline */}
-        {phases.length > 0 && <GanttChart phases={phases} />}
+        {/* Section 1 */}
+        <Section number="1" title="Why Are We Doing This?">
+          <p>{e.purpose || project.purpose || '—'}</p>
+        </Section>
 
-        {/* Charter details grid */}
-        <div className="charter-block">
-          <h2>Charter Details</h2>
-          <div className="sections-grid">
-            <SectionPanel title="Objectives" icon="🎯" content={enhanced?.objectives || project.objectives} />
-            <SectionPanel title="Scope" icon="📐" content={enhanced?.scope || project.scope} />
-            <SectionPanel title="Description" icon="📋" content={enhanced?.description || project.description} />
-            {enhanced?.stakeholderNote && (
-              <SectionPanel title="Stakeholders" icon="👥" content={enhanced.stakeholderNote} />
-            )}
-          </div>
-        </div>
+        <hr className="charter-divider" />
 
-        {/* Risks */}
-        {enhanced?.risks?.length > 0
-          ? <RiskMatrix risks={enhanced.risks} />
-          : project.risks && (
-            <div className="charter-block">
-              <h2>Risks</h2>
-              <div className="sections-grid">
-                <SectionPanel title="Identified Risks" icon="⚠️" content={project.risks} />
-              </div>
+        {/* Section 2 */}
+        <Section number="2" title="What Will We Deliver?">
+          {deliverables.filter(Boolean).length > 0 && (
+            <ul className="charter-list">
+              {deliverables.filter(Boolean).map((d, i) => <li key={i}>{d}</li>)}
+            </ul>
+          )}
+          {outOfScope.filter(Boolean).length > 0 && (
+            <div className="charter-out-of-scope">
+              <strong>Out of scope:</strong>
+              <ul className="charter-list">
+                {outOfScope.filter(Boolean).map((o, i) => <li key={i}>{o}</li>)}
+              </ul>
             </div>
           )}
+        </Section>
 
-        {/* KPIs */}
-        <KPISection kpis={kpis} />
+        <hr className="charter-divider" />
 
-        {/* Team */}
-        {resources.length > 0 && (
-          <div className="charter-block">
-            <h2>Team Resources</h2>
-            <div className="resources-grid">
-              {resources.map((r, i) => (
-                <div key={i} className="resource-card">
-                  <div className="resource-avatar">{r.name?.charAt(0)?.toUpperCase() || '?'}</div>
-                  <div>
-                    <strong>{r.name}</strong>
-                    <p>{r.role}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Section 3 */}
+        {team.length > 0 && (
+          <>
+            <Section number="3" title="Team">
+              <CharterTable
+                headers={['Role', 'Name']}
+                rows={team.map(t => [t.role, t.name])}
+              />
+            </Section>
+            <hr className="charter-divider" />
+          </>
         )}
+
+        {/* Section 4 */}
+        <Section number="4" title="Timeline">
+          {ganttPhases.length > 0 && (
+            <div className="charter-gantt-wrap">
+              <GanttChart phases={ganttPhases} />
+            </div>
+          )}
+          {phases.filter(p => p.phase).length > 0 && (
+            <CharterTable
+              headers={['Phase', 'Start Date', 'Target Date']}
+              rows={phases.filter(p => p.phase).map(p => [p.phase, p.startDate, p.endDate])}
+            />
+          )}
+        </Section>
+
+        <hr className="charter-divider" />
+
+        {/* Section 5 */}
+        <Section number="5" title="Budget">
+          <p>{e.budgetNote || project.budget || 'TBD pending approval'}</p>
+        </Section>
+
+        <hr className="charter-divider" />
+
+        {/* Section 6 */}
+        <Section number="6" title="Top Risks">
+          {Array.isArray(risks) && risks.length > 0 ? (
+            <CharterTable
+              headers={['Risk', 'Mitigation']}
+              rows={risks.map(r => [r.risk || r, r.mitigation || ''])}
+            />
+          ) : (
+            <p>{typeof risks === 'string' ? risks : '—'}</p>
+          )}
+        </Section>
+
+        <hr className="charter-divider" />
+
+        {/* Section 7 */}
+        <Section number="7" title="Approval">
+          {approvals.length > 0 ? (
+            <CharterTable
+              headers={['Name', 'Role', 'Date']}
+              rows={approvals.map(a => [a.name, a.role, a.date])}
+            />
+          ) : (
+            <p className="charter-approval-placeholder">Pending sign-off</p>
+          )}
+        </Section>
+
       </div>
     </div>
   );

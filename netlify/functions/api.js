@@ -1,10 +1,9 @@
 const crypto = require('crypto');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// In-memory store — resets on each cold start (use MongoDB Atlas for persistence)
 const memoryStore = [];
 
-// --- Gemini enhancement ---
+// --- Gemini ---
 
 async function enhanceWithGemini(data) {
   const key = process.env.GEMINI_API_KEY;
@@ -13,28 +12,32 @@ async function enhanceWithGemini(data) {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const prompt = `You are a professional project manager. Enhance the following project charter input into polished, professional language. Return ONLY valid JSON — no markdown, no code fences.
+    const prompt = `You are a professional project manager writing a formal project charter. Polish the following raw inputs and return ONLY valid JSON — no markdown, no code fences.
 
-Input:
-Name: ${data.name}
-Description: ${data.description || '(not provided)'}
-Objectives: ${data.objectives || '(not provided)'}
-Scope: ${data.scope || '(not provided)'}
-Risks: ${data.risks || '(not provided)'}
-Phases: ${JSON.stringify(data.phases || [])}
-Resources: ${JSON.stringify(data.resources || [])}
+Project: ${data.name}
+PM: ${data.projectManager || 'N/A'} | Sponsor: ${data.sponsor || 'N/A'}
+Dates: ${data.startDate || 'N/A'} → ${data.endDate || 'N/A'} | Status: ${data.status || 'Draft'}
 
-Return exactly this JSON structure:
+WHY (purpose): ${data.purpose || 'N/A'}
+
+DELIVERABLES: ${(data.deliverables || []).filter(Boolean).join(' | ')}
+OUT OF SCOPE: ${(data.outOfScope || []).filter(Boolean).join(' | ')}
+
+TEAM: ${JSON.stringify(data.team || [])}
+PHASES: ${JSON.stringify(data.phases || [])}
+BUDGET: ${data.budget || 'N/A'}
+RISKS: ${JSON.stringify(data.risks || [])}
+
+Return this exact JSON structure:
 {
-  "executiveSummary": "2-3 sentence professional project overview",
-  "description": "polished description",
-  "objectives": "well-structured objectives in professional language",
-  "scope": "clear scope statement with in-scope and out-of-scope notes",
+  "executiveSummary": "2-3 sentence professional project summary for the charter header",
+  "purpose": "Polished 2-3 sentence purpose statement. Clear, professional, no jargon.",
+  "deliverables": ["Polished deliverable 1", "Polished deliverable 2"],
+  "outOfScope": ["Polished out-of-scope item 1"],
   "risks": [
-    { "title": "risk name", "description": "detailed explanation", "likelihood": "High|Medium|Low", "impact": "High|Medium|Low" }
+    { "risk": "Risk title", "mitigation": "How we handle it" }
   ],
-  "kpis": ["KPI 1", "KPI 2", "KPI 3", "KPI 4"],
-  "stakeholderNote": "suggested stakeholders and communication approach"
+  "budgetNote": "Polished budget statement, or repeat the input if already clear"
 }`;
 
     const result = await model.generateContent(prompt);
@@ -48,39 +51,46 @@ Return exactly this JSON structure:
   }
 }
 
-// --- In-memory CRUD ---
+// --- CRUD ---
 
 function createProject(sessionId, data, enhanced) {
   const project = {
     _id: crypto.randomUUID(),
     sessionId,
     name: data.name || '',
-    description: data.description || '',
-    objectives: data.objectives || '',
-    scope: data.scope || '',
-    risks: data.risks || '',
+    projectManager: data.projectManager || '',
+    sponsor: data.sponsor || '',
+    startDate: data.startDate || '',
+    endDate: data.endDate || '',
+    status: data.status || 'Draft',
+    purpose: data.purpose || '',
+    deliverables: Array.isArray(data.deliverables) ? data.deliverables : [],
+    outOfScope: Array.isArray(data.outOfScope) ? data.outOfScope : [],
+    team: Array.isArray(data.team) ? data.team : [],
     phases: Array.isArray(data.phases) ? data.phases : [],
-    resources: Array.isArray(data.resources) ? data.resources : [],
+    budget: data.budget || '',
+    risks: Array.isArray(data.risks) ? data.risks : [],
+    approvals: Array.isArray(data.approvals) ? data.approvals : [],
     ...(enhanced ? { enhanced } : {}),
     createdAt: new Date().toISOString(),
   };
   memoryStore.push(project);
-  const { sessionId: _, ...publicProject } = project;
-  return publicProject;
+  const { sessionId: _, ...pub } = project;
+  return pub;
 }
 
 function findAll(sessionId) {
   return memoryStore
-    .filter((p) => p.sessionId === sessionId)
+    .filter(p => p.sessionId === sessionId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map(({ sessionId: _, ...p }) => p);
 }
 
 function findById(sessionId, id) {
-  const project = memoryStore.find((p) => p._id === id && p.sessionId === sessionId);
-  if (!project) return null;
-  const { sessionId: _, ...publicProject } = project;
-  return publicProject;
+  const p = memoryStore.find(p => p._id === id && p.sessionId === sessionId);
+  if (!p) return null;
+  const { sessionId: _, ...pub } = p;
+  return pub;
 }
 
 // --- Response helper ---
@@ -103,7 +113,6 @@ function json(statusCode, body) {
 exports.handler = async (event) => {
   const { httpMethod, path, body, headers } = event;
 
-  // CORS preflight
   if (httpMethod === 'OPTIONS') {
     return {
       statusCode: 204,
@@ -123,7 +132,6 @@ exports.handler = async (event) => {
     .replace(/^\/.netlify\/functions\/api/, '')
     .replace(/^\/api/, '') || '/';
 
-  // POST /api/project
   if (httpMethod === 'POST' && route === '/project') {
     try {
       const data = JSON.parse(body || '{}');
@@ -136,12 +144,10 @@ exports.handler = async (event) => {
     }
   }
 
-  // GET /api/projects
   if (httpMethod === 'GET' && route === '/projects') {
     return json(200, findAll(sessionId));
   }
 
-  // GET /api/project/:id
   if (httpMethod === 'GET' && route.startsWith('/project/')) {
     const id = route.replace('/project/', '');
     const project = findById(sessionId, id);
