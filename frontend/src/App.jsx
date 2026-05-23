@@ -7,13 +7,11 @@ import './App.css';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="app">
-        <Routes>
-          <Route path="/" element={<ProjectList />} />
-          <Route path="/new" element={<CharterWizard />} />
-          <Route path="/project/:id" element={<ProjectDashboard />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<div className="app"><ProjectList /></div>} />
+        <Route path="/new" element={<CharterWizard />} />
+        <Route path="/project/:id" element={<ProjectDashboard />} />
+      </Routes>
     </BrowserRouter>
   );
 }
