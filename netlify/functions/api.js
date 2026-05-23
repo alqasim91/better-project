@@ -7,7 +7,7 @@ const memoryStore = [];
 
 async function enhanceWithGemini(data) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
+  if (!key) return { _error: 'GEMINI_API_KEY not set' };
   try {
     const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
@@ -16,7 +16,7 @@ async function enhanceWithGemini(data) {
 
 Project: ${data.name}
 PM: ${data.projectManager || 'N/A'} | Sponsor: ${data.sponsor || 'N/A'}
-Dates: ${data.startDate || 'N/A'} → ${data.endDate || 'N/A'} | Status: ${data.status || 'Draft'}
+Dates: ${data.startDate || 'N/A'} to ${data.endDate || 'N/A'} | Status: ${data.status || 'Draft'}
 
 WHY (purpose): ${data.purpose || 'N/A'}
 
@@ -43,11 +43,10 @@ Return this exact JSON structure:
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    if (!match) return { _error: 'Gemini returned no JSON' };
     return JSON.parse(match[0]);
   } catch (err) {
-    console.warn('Gemini enhancement failed:', err.message);
-    return null;
+    return { _error: err.message };
   }
 }
 

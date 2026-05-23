@@ -86,6 +86,16 @@ export default function ProjectDashboard() {
       {/* Charter document */}
       <div className="charter-doc" id="charter-export">
 
+        {/* AI status — temporary diagnostic, hidden once working */}
+        {e._error && (
+          <div className="ai-error-banner no-print">
+            ⚠️ AI enhancement failed: <code>{e._error}</code>. Showing your raw input.
+          </div>
+        )}
+        {!e._error && e.executiveSummary && (
+          <div className="ai-ok-banner no-print">✨ AI enhanced</div>
+        )}
+
         {/* Cover header */}
         <div className="charter-cover">
           <div className="charter-cover-label">Project Charter</div>
