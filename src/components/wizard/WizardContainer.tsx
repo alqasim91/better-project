@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, RotateCcw, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, RotateCcw, Lock, FileDown } from "lucide-react";
 import { useWizard } from "@/hooks/useWizard";
 import { useFormPersistence, clearPersistedCharter } from "@/hooks/useFormPersistence";
 import {
@@ -42,6 +42,8 @@ const SECTION_FORMS: Record<CharterSectionId, () => JSX.Element> = {
 interface WizardContainerProps {
   /** Called when the user chooses to pick a different template. */
   onChangeTemplate?: () => void;
+  /** Called when the user finishes the last step and wants to review/export. */
+  onFinish?: () => void;
 }
 
 /**
@@ -49,7 +51,7 @@ interface WizardContainerProps {
  * rail and completeness sidebar. Hosts the Auto-Generate flow and gates
  * progression on the 60% completeness threshold.
  */
-export function WizardContainer({ onChangeTemplate }: WizardContainerProps) {
+export function WizardContainer({ onChangeTemplate, onFinish }: WizardContainerProps) {
   useFormPersistence();
 
   const { activeStep, isFirstStep, isLastStep, next, back } = useWizard();
@@ -109,9 +111,15 @@ export function WizardContainer({ onChangeTemplate }: WizardContainerProps) {
                 <Button variant="outline" onClick={back} disabled={isFirstStep}>
                   <ArrowLeft className="h-4 w-4" /> Back
                 </Button>
-                <Button onClick={next} disabled={isLastStep || !canProceed}>
-                  Next <ArrowRight className="h-4 w-4" />
-                </Button>
+                {isLastStep ? (
+                  <Button onClick={() => onFinish?.()} disabled={!canProceed}>
+                    Review & Export <FileDown className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button onClick={next} disabled={!canProceed}>
+                    Next <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>

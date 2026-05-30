@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { InfoHint } from "@/components/ui/InfoHint";
 import type { Deliverable } from "@/types/charter";
 
 /** Section 6 — concrete outputs with acceptance criteria and due dates. */
@@ -33,13 +34,11 @@ export function DeliverablesForm() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <p className="text-sm text-muted-foreground">
           Define each tangible output and how it will be accepted.
         </p>
-        <Button type="button" size="sm" variant="secondary" onClick={add}>
-          <Plus className="h-4 w-4" /> Add deliverable
-        </Button>
+        <InfoHint label="A deliverable is a tangible thing you produce (e.g., 'Trained staff', 'API docs v1') with acceptance criteria. Different from a milestone, which is a moment in time marking progress." />
       </div>
 
       {deliverables.length === 0 && (
@@ -90,6 +89,10 @@ export function DeliverablesForm() {
           </div>
         ))}
       </div>
+
+      <Button type="button" size="sm" variant="secondary" onClick={add}>
+        <Plus className="h-4 w-4" /> Add deliverable
+      </Button>
     </div>
   );
 }

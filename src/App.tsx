@@ -64,7 +64,10 @@ export default function App() {
           <TemplateSelector onSelected={() => setStage("wizard")} />
         )}
         {stage === "wizard" && (
-          <WizardContainer onChangeTemplate={() => setStage("select-template")} />
+          <WizardContainer
+            onChangeTemplate={() => setStage("select-template")}
+            onFinish={() => setStage("export")}
+          />
         )}
         {stage === "dashboard" && <DashboardView />}
         {stage === "export" && <FinalReview />}

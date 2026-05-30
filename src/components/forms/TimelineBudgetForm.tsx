@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { InfoHint } from "@/components/ui/InfoHint";
 import type { Milestone, MilestoneType } from "@/types/charter";
 
 const MILESTONE_TYPES: MilestoneType[] = ["milestone", "deliverable", "review"];
@@ -41,7 +42,10 @@ export function TimelineBudgetForm() {
     <div className="space-y-5">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label>Milestones</Label>
+          <div className="flex items-center gap-2">
+            <Label>Milestones</Label>
+            <InfoHint label="A milestone is a checkpoint in time marking progress (e.g., 'Beta launch', 'Regulatory approval'). Different from a deliverable, which is a tangible output. A milestone often marks when one or more deliverables are complete." />
+          </div>
           <Button type="button" size="sm" variant="secondary" onClick={addMilestone}>
             <Plus className="h-4 w-4" /> Add milestone
           </Button>
