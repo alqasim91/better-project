@@ -118,49 +118,83 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
 
         {!hasResults ? (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ai-name">Project name</Label>
-              <Input
-                id="ai-name"
-                value={inputs.projectName}
-                placeholder="e.g. Customer Portal Redesign"
-                onChange={(e) => setInputs({ ...inputs, projectName: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai-goals">
-                {hasExistingContent ? "Extra context — goals (optional)" : "Primary goals"}
-              </Label>
-              <Textarea
-                id="ai-goals"
-                rows={2}
-                value={inputs.goals}
-                placeholder={
-                  hasExistingContent
-                    ? "Anything not yet in the charter you want AI to incorporate?"
-                    : "What should this project achieve?"
-                }
-                onChange={(e) => setInputs({ ...inputs, goals: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai-stakeholders">
-                {hasExistingContent ? "Extra context — stakeholders (optional)" : "Key stakeholders"}
-              </Label>
-              <Textarea
-                id="ai-stakeholders"
-                rows={2}
-                value={inputs.stakeholders}
-                placeholder={
-                  hasExistingContent
-                    ? "Additional stakeholders to consider?"
-                    : "Who's involved or affected?"
-                }
-                onChange={(e) =>
-                  setInputs({ ...inputs, stakeholders: e.target.value })
-                }
-              />
-            </div>
+            {hasExistingContent ? (
+              <>
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <p className="font-medium">AI will refine these sections you've already filled:</p>
+                  <ul className="mt-2 space-y-1 text-muted-foreground">
+                    {charter.basics.projectName && (
+                      <li>• <span className="text-foreground">Project basics</span> — {charter.basics.projectName}</li>
+                    )}
+                    {(charter.goals.visionStatement || charter.goals.objectives.length > 0) && (
+                      <li>• <span className="text-foreground">Goals</span> — {charter.goals.objectives.length} objective{charter.goals.objectives.length === 1 ? "" : "s"}</li>
+                    )}
+                    {charter.stakeholders.stakeholders.length > 0 && (
+                      <li>• <span className="text-foreground">Stakeholders</span> — {charter.stakeholders.stakeholders.length}</li>
+                    )}
+                    {(charter.scope.inScope.length > 0 || charter.scope.outOfScope.length > 0) && (
+                      <li>• <span className="text-foreground">Scope</span> — {charter.scope.inScope.length} in / {charter.scope.outOfScope.length} out</li>
+                    )}
+                    {(charter.risks.risks.length > 0 || charter.risks.assumptions.length > 0) && (
+                      <li>• <span className="text-foreground">Risks</span> — {charter.risks.risks.length}</li>
+                    )}
+                    {charter.deliverables.deliverables.length > 0 && (
+                      <li>• <span className="text-foreground">Deliverables</span> — {charter.deliverables.deliverables.length}</li>
+                    )}
+                    {charter.timeline.milestones.length > 0 && (
+                      <li>• <span className="text-foreground">Timeline</span> — {charter.timeline.milestones.length} milestone{charter.timeline.milestones.length === 1 ? "" : "s"}</li>
+                    )}
+                  </ul>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Your existing facts (names, dates, numbers) will be preserved. Empty fields will be filled in.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-notes">Anything else AI should know? (optional)</Label>
+                  <Textarea
+                    id="ai-notes"
+                    rows={2}
+                    value={inputs.goals}
+                    placeholder="Extra context, constraints, or goals not yet captured in the form."
+                    onChange={(e) => setInputs({ ...inputs, goals: e.target.value })}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-name">Project name</Label>
+                  <Input
+                    id="ai-name"
+                    value={inputs.projectName}
+                    placeholder="e.g. Customer Portal Redesign"
+                    onChange={(e) => setInputs({ ...inputs, projectName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-goals">Primary goals</Label>
+                  <Textarea
+                    id="ai-goals"
+                    rows={2}
+                    value={inputs.goals}
+                    placeholder="What should this project achieve?"
+                    onChange={(e) => setInputs({ ...inputs, goals: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ai-stakeholders">Key stakeholders</Label>
+                  <Textarea
+                    id="ai-stakeholders"
+                    rows={2}
+                    value={inputs.stakeholders}
+                    placeholder="Who's involved or affected?"
+                    onChange={(e) =>
+                      setInputs({ ...inputs, stakeholders: e.target.value })
+                    }
+                  />
+                </div>
+              </>
+            )}
 
             {generation.progress && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -207,7 +241,10 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
           {!hasResults ? (
             <Button
               onClick={handleGenerate}
-              disabled={generation.isGenerating || !inputs.projectName.trim()}
+              disabled={
+                generation.isGenerating ||
+                (!hasExistingContent && !inputs.projectName.trim())
+              }
             >
               {generation.isGenerating ? (
                 <>
