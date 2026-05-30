@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { MinimalInputs } from "@/types/charter";
+import type { Charter, MinimalInputs } from "@/types/charter";
 import type { ConfidenceScore, GeneratedSection } from "@/types/ai";
 import { generateCharterDraft } from "@/services/ai/charterGenerator";
 import { scoreConfidence } from "@/services/ai/confidenceScorer";
@@ -33,7 +33,11 @@ export function useCharterGeneration() {
   const [error, setError] = useState<string | null>(null);
 
   const generate = useCallback(
-    async (inputs: MinimalInputs, templateContext?: string) => {
+    async (
+      inputs: MinimalInputs,
+      templateContext?: string,
+      existingCharter?: Charter,
+    ) => {
       setIsGenerating(true);
       setError(null);
       setSections([]);
@@ -43,6 +47,7 @@ export function useCharterGeneration() {
         const result = await generateCharterDraft(inputs, {
           templateId: selectTemplateId,
           templateContext,
+          existingCharter,
         });
         setProgress({ step: 3, total: PROGRESS_STEPS.length, label: PROGRESS_STEPS[2] });
         setSections(result);

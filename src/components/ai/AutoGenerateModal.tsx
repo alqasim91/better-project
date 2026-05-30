@@ -52,8 +52,28 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
 
   const hasResults = generation.sections.length > 0;
 
+  // Detect whether the user has typed enough that we should refine rather than
+  // start from scratch. Mirrors hasMeaningfulContent() in the server prompt.
+  const hasExistingContent =
+    Boolean(charter.basics.summary?.trim()) ||
+    Boolean(charter.basics.sponsor?.trim()) ||
+    Boolean(charter.basics.projectManager?.trim()) ||
+    Boolean(charter.goals.visionStatement?.trim()) ||
+    Boolean(charter.goals.businessCase?.trim()) ||
+    charter.goals.objectives.length > 0 ||
+    charter.stakeholders.stakeholders.length > 0 ||
+    charter.scope.inScope.length > 0 ||
+    charter.scope.outOfScope.length > 0 ||
+    charter.deliverables.deliverables.length > 0 ||
+    charter.risks.risks.length > 0 ||
+    charter.timeline.milestones.length > 0;
+
   const handleGenerate = async () => {
-    const sections = await generation.generate(inputs, template?.description);
+    const sections = await generation.generate(
+      inputs,
+      template?.description,
+      hasExistingContent ? charter : undefined,
+    );
     setDecisions({});
     if (sections.length > 0) {
       await scoring.scoreAll(sections, inputs);
@@ -87,11 +107,12 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Auto-generate charter
+            {hasExistingContent ? "Refine charter with AI" : "Auto-generate charter"}
           </DialogTitle>
           <DialogDescription>
-            Give a few details and GPT-4 will draft every section. Each is scored
-            for confidence so you can review extrapolations before accepting.
+            {hasExistingContent
+              ? "AI will polish your existing wording, fill empty fields, and preserve every fact you've entered (names, dates, numbers). Optionally add extra context below."
+              : "Give a few details and AI will draft every section. Each is scored for confidence so you can review extrapolations before accepting."}
           </DialogDescription>
         </DialogHeader>
 
@@ -107,22 +128,34 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ai-goals">Primary goals</Label>
+              <Label htmlFor="ai-goals">
+                {hasExistingContent ? "Extra context — goals (optional)" : "Primary goals"}
+              </Label>
               <Textarea
                 id="ai-goals"
                 rows={2}
                 value={inputs.goals}
-                placeholder="What should this project achieve?"
+                placeholder={
+                  hasExistingContent
+                    ? "Anything not yet in the charter you want AI to incorporate?"
+                    : "What should this project achieve?"
+                }
                 onChange={(e) => setInputs({ ...inputs, goals: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ai-stakeholders">Key stakeholders</Label>
+              <Label htmlFor="ai-stakeholders">
+                {hasExistingContent ? "Extra context — stakeholders (optional)" : "Key stakeholders"}
+              </Label>
               <Textarea
                 id="ai-stakeholders"
                 rows={2}
                 value={inputs.stakeholders}
-                placeholder="Who's involved or affected?"
+                placeholder={
+                  hasExistingContent
+                    ? "Additional stakeholders to consider?"
+                    : "Who's involved or affected?"
+                }
                 onChange={(e) =>
                   setInputs({ ...inputs, stakeholders: e.target.value })
                 }
@@ -178,11 +211,13 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
             >
               {generation.isGenerating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {hasExistingContent ? "Refining…" : "Generating…"}
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" /> Generate
+                  <Sparkles className="h-4 w-4" />
+                  {hasExistingContent ? "Refine with AI" : "Generate"}
                 </>
               )}
             </Button>

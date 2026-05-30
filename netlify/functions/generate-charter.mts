@@ -13,12 +13,16 @@ export default async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { inputs, templateContext } = await req.json();
+    const { inputs, templateContext, existingCharter } = await req.json();
     if (!inputs) {
       return jsonResponse({ error: "Missing 'inputs'" }, 400);
     }
 
-    const { system, user } = buildGenerationPrompt(inputs, templateContext);
+    const { system, user } = buildGenerationPrompt(
+      inputs,
+      templateContext,
+      existingCharter,
+    );
     const result = await chatCompletion([
       { role: "system", content: system },
       { role: "user", content: user },

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MinimalInputs, CharterSectionId } from "@/types/charter";
+import type { Charter, MinimalInputs, CharterSectionId } from "@/types/charter";
 import type { GeneratedSection, GenerationResult } from "@/types/ai";
 import { callFunction } from "@/lib/apiClient";
 
@@ -31,6 +31,7 @@ const generationResultSchema = z.object({
 export interface GenerateOptions {
   templateId?: string | null;
   templateContext?: string;
+  existingCharter?: Charter;
 }
 
 /**
@@ -46,6 +47,7 @@ export async function generateCharterDraft(
     inputs,
     templateId: options.templateId ?? null,
     templateContext: options.templateContext,
+    existingCharter: options.existingCharter,
   });
 
   const result = generationResultSchema.parse(response);
