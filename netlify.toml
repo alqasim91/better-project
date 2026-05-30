@@ -1,0 +1,21 @@
+# Netlify build & functions config.
+# Connect this repo at app.netlify.com → "Add new site" → "Import from GitHub".
+# Then set OPENAI_API_KEY under Site settings → Environment variables.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+
+# SPA fallback: serve index.html for client-side routes. Function and asset
+# requests are matched by Netlify before this rule, so they're unaffected.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
