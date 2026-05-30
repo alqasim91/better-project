@@ -117,7 +117,8 @@ export function useConfidenceScoring() {
     [],
   );
 
-  /** Score many sections in parallel. */
+  /** Score many sections in parallel. Resilient: one section's failure
+   * doesn't drop the others. */
   const scoreAll = useCallback(
     async (
       toScore: GeneratedSection[],
@@ -127,18 +128,29 @@ export function useConfidenceScoring() {
       setIsScoring(true);
       setError(null);
       try {
-        const results = await Promise.all(
+        const settled = await Promise.allSettled(
           toScore.map((s) => scoreConfidence(s, sources, existingCharter)),
         );
+        const results: ConfidenceScore[] = [];
+        const errors: string[] = [];
+        settled.forEach((r) => {
+          if (r.status === "fulfilled") {
+            results.push(r.value);
+          } else {
+            errors.push(r.reason?.message ?? String(r.reason));
+          }
+        });
         setScores((prev) => {
           const next = { ...prev };
           results.forEach((r) => (next[r.sectionId] = r));
           return next;
         });
+        if (errors.length > 0) {
+          setError(
+            `Scoring failed for ${errors.length} of ${toScore.length} section(s). ${errors[0]}`,
+          );
+        }
         return results;
-      } catch (err) {
-        setError((err as Error).message);
-        return [];
       } finally {
         setIsScoring(false);
       }

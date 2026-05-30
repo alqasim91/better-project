@@ -235,6 +235,13 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
                 setDecisions((prev) => ({ ...prev, [id]: action }))
               }
             />
+
+            {scoring.error && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                {scoring.error}
+              </div>
+            )}
           </div>
         )}
 

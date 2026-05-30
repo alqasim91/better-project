@@ -36,11 +36,24 @@ export function ReviewSuggestions({
     return score ? score.score < threshold : false;
   });
 
+  const scoredCount = sections.filter((s) => scores[s.sectionId]).length;
+  const noScoresAtAll = scoredCount === 0;
+
   if (flagged.length === 0) {
+    if (noScoresAtAll) {
+      return (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <AlertTriangle className="mr-1 inline h-4 w-4" />
+          Confidence scoring is unavailable — please review each generated section
+          carefully before applying.
+        </div>
+      );
+    }
     return (
       <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
         <Check className="mr-1 inline h-4 w-4" />
-        No low-confidence extrapolations — all sections are well grounded.
+        No low-confidence extrapolations — all {scoredCount} sections are well
+        grounded.
       </div>
     );
   }
