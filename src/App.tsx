@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Sparkles, LayoutDashboard, FileEdit } from "lucide-react";
+import {
+  Sparkles,
+  LayoutDashboard,
+  FileEdit,
+  FileDown,
+} from "lucide-react";
 import { TemplateSelector } from "@/components/templates/TemplateSelector";
 import { WizardContainer } from "@/components/wizard/WizardContainer";
 import { DashboardView } from "@/components/dashboard/DashboardView";
+import { FinalReview } from "@/components/charter/FinalReview";
 import { Button } from "@/components/ui/button";
 
-type Stage = "select-template" | "wizard" | "dashboard";
+type Stage = "select-template" | "wizard" | "dashboard" | "export";
 
 export default function App() {
   const [stage, setStage] = useState<Stage>("select-template");
@@ -41,6 +47,13 @@ export default function App() {
               >
                 <LayoutDashboard className="h-4 w-4" /> Dashboard
               </Button>
+              <Button
+                size="sm"
+                variant={stage === "export" ? "default" : "ghost"}
+                onClick={() => setStage("export")}
+              >
+                <FileDown className="h-4 w-4" /> Export
+              </Button>
             </div>
           )}
         </div>
@@ -54,6 +67,7 @@ export default function App() {
           <WizardContainer onChangeTemplate={() => setStage("select-template")} />
         )}
         {stage === "dashboard" && <DashboardView />}
+        {stage === "export" && <FinalReview />}
       </main>
     </div>
   );
