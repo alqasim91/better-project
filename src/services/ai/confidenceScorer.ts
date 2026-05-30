@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MinimalInputs } from "@/types/charter";
+import type { Charter, MinimalInputs } from "@/types/charter";
 import type { ConfidenceScore, GeneratedSection } from "@/types/ai";
 import { callFunction } from "@/lib/apiClient";
 
@@ -17,12 +17,14 @@ const scoreResponseSchema = z.object({
 export async function scoreConfidence(
   generated: GeneratedSection,
   sources: MinimalInputs,
+  existingCharter?: Charter,
 ): Promise<ConfidenceScore> {
   const response = await callFunction<z.infer<typeof scoreResponseSchema>>(
     "score-confidence",
     {
       generatedSection: generated,
       sourceInputs: sources,
+      existingCharter,
     },
   );
 

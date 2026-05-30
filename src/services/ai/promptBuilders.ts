@@ -122,23 +122,33 @@ export function buildGenerationPrompt(
 export function buildConfidenceScoringPrompt(
   generatedSection: GeneratedSection,
   sourceInputs: MinimalInputs,
+  existingCharter?: Charter,
 ): ChatPrompt {
+  const isRefinement = hasMeaningfulContent(existingCharter);
+
   const system = [
     "You audit AI-generated project charter sections for over-extrapolation.",
-    "Given the original sparse inputs and a generated section, judge how well-grounded the section is on a 0-100 scale (100 = directly supported by inputs, 0 = pure speculation).",
+    isRefinement
+      ? "The user already had a partial charter; the AI was asked to refine and fill gaps. Judge how well-grounded the generated section is in the user's existing charter content PLUS any additional context they provided. Content that simply rephrases existing user content, or fills empty fields with plausible industry-standard detail, should score HIGH (80-100). Score LOW only for invented specific facts (names, exact figures, dates that contradict the user's input)."
+      : "Given the original sparse inputs and a generated section, judge how well-grounded the section is on a 0-100 scale (100 = directly supported by inputs, 0 = pure speculation).",
     'Return ONLY JSON: { "score": number, "reasoning": string, "flags": string[] }.',
     "Each flag names a specific assumption or fabricated detail a human should verify.",
   ].join("\n\n");
 
   const user = [
-    "ORIGINAL INPUTS:",
+    isRefinement ? "USER'S EXISTING CHARTER (treat as authoritative source):" : null,
+    isRefinement ? JSON.stringify(existingCharter, null, 2) : null,
+    isRefinement ? "" : null,
+    "ADDITIONAL USER INPUTS:",
     `- Project: ${sourceInputs.projectName || "(none)"}`,
     `- Goals: ${sourceInputs.goals || "(none)"}`,
     `- Stakeholders: ${sourceInputs.stakeholders || "(none)"}`,
     "",
     `GENERATED SECTION (${generatedSection.sectionId} — ${generatedSection.title}):`,
     JSON.stringify(generatedSection.data, null, 2),
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   return { system, user };
 }

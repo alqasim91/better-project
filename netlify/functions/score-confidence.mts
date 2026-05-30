@@ -13,7 +13,7 @@ export default async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { generatedSection, sourceInputs } = await req.json();
+    const { generatedSection, sourceInputs, existingCharter } = await req.json();
     if (!generatedSection || !sourceInputs) {
       return jsonResponse(
         { error: "Missing 'generatedSection' or 'sourceInputs'" },
@@ -24,6 +24,7 @@ export default async (req: Request): Promise<Response> => {
     const { system, user } = buildConfidenceScoringPrompt(
       generatedSection,
       sourceInputs,
+      existingCharter,
     );
     const result = await chatCompletion(
       [

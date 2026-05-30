@@ -76,7 +76,11 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
     );
     setDecisions({});
     if (sections.length > 0) {
-      await scoring.scoreAll(sections, inputs);
+      await scoring.scoreAll(
+        sections,
+        inputs,
+        hasExistingContent ? charter : undefined,
+      );
     }
   };
 

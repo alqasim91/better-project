@@ -96,11 +96,15 @@ export function useConfidenceScoring() {
   const [error, setError] = useState<string | null>(null);
 
   const scoreSection = useCallback(
-    async (section: GeneratedSection, sources: MinimalInputs) => {
+    async (
+      section: GeneratedSection,
+      sources: MinimalInputs,
+      existingCharter?: Charter,
+    ) => {
       setIsScoring(true);
       setError(null);
       try {
-        const result = await scoreConfidence(section, sources);
+        const result = await scoreConfidence(section, sources, existingCharter);
         setScores((prev) => ({ ...prev, [section.sectionId]: result }));
         return result;
       } catch (err) {
@@ -115,12 +119,16 @@ export function useConfidenceScoring() {
 
   /** Score many sections in parallel. */
   const scoreAll = useCallback(
-    async (toScore: GeneratedSection[], sources: MinimalInputs) => {
+    async (
+      toScore: GeneratedSection[],
+      sources: MinimalInputs,
+      existingCharter?: Charter,
+    ) => {
       setIsScoring(true);
       setError(null);
       try {
         const results = await Promise.all(
-          toScore.map((s) => scoreConfidence(s, sources)),
+          toScore.map((s) => scoreConfidence(s, sources, existingCharter)),
         );
         setScores((prev) => {
           const next = { ...prev };
