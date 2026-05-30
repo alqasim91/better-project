@@ -1,5 +1,5 @@
 // Chat Completions helper for Netlify Functions (Node runtime).
-// Uses the Kimi 2 API (Moonshot AI) via its OpenAI-compatible endpoint.
+// Uses the Kimi 2 API (moonshot.ai) via its OpenAI-compatible endpoint.
 //
 // Env vars (set in Netlify → Site settings → Environment variables):
 //   MOONSHOT_API_KEY  — required
@@ -16,7 +16,7 @@ export interface ChatResult {
   tokensUsed: number;
 }
 
-const KIMI_URL = "https://api.moonshot.cn/v1/chat/completions";
+const KIMI_URL = "https://api.moonshot.ai/v1/chat/completions";
 const DEFAULT_MODEL = "kimi-k2-0711-chat";
 const TIMEOUT_MS = 25_000;
 
