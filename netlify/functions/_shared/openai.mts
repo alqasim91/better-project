@@ -16,7 +16,7 @@ export interface ChatResult {
   tokensUsed: number;
 }
 
-const DEFAULT_MODEL = "gemini-3.5-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const TIMEOUT_MS = 25_000;
 
 export async function chatCompletion(
@@ -73,6 +73,13 @@ export async function chatCompletion(
     const tokensUsed: number = json.usageMetadata?.totalTokenCount ?? 0;
 
     return { content: text, model, tokensUsed };
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      throw new Error(
+        `Gemini request timed out after ${TIMEOUT_MS / 1000}s (model: ${model}).`,
+      );
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
