@@ -1,11 +1,7 @@
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, RotateCcw, Lock, FileDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, RotateCcw, FileDown } from "lucide-react";
 import { useWizard } from "@/hooks/useWizard";
 import { useFormPersistence, clearPersistedCharter } from "@/hooks/useFormPersistence";
-import {
-  useCompletenessValidation,
-  MIN_COMPLETENESS_TO_PROCEED,
-} from "@/hooks/useValidation";
 import { useCharterStore } from "@/stores/charterStore";
 import {
   Card,
@@ -44,24 +40,38 @@ interface WizardContainerProps {
   onChangeTemplate?: () => void;
   /** Called when the user finishes the last step and wants to review/export. */
   onFinish?: () => void;
+  /** Open the AI draft modal on mount (the AI-first entry path). */
+  autoOpenAI?: boolean;
+  /** Acknowledge that the auto-open was handled, so it fires only once. */
+  onAutoOpenConsumed?: () => void;
 }
 
 /**
  * The Core Form Engine: renders the active section form alongside the step
- * rail and completeness sidebar. Hosts the Auto-Generate flow and gates
- * progression on the 60% completeness threshold.
+ * rail and completeness sidebar. Hosts the Auto-Generate flow. Navigation is
+ * free — completeness only gates the final export, not step-to-step movement.
  */
-export function WizardContainer({ onChangeTemplate, onFinish }: WizardContainerProps) {
+export function WizardContainer({
+  onChangeTemplate,
+  onFinish,
+  autoOpenAI,
+  onAutoOpenConsumed,
+}: WizardContainerProps) {
   useFormPersistence();
 
   const { activeStep, isFirstStep, isLastStep, next, back } = useWizard();
-  const { completenessPercent, isValid } = useCompletenessValidation();
   const reset = useCharterStore((s) => s.reset);
   const [aiOpen, setAiOpen] = useState(false);
 
+  // AI-first path: open the draft modal once when entering the wizard.
+  useEffect(() => {
+    if (autoOpenAI) {
+      setAiOpen(true);
+      onAutoOpenConsumed?.();
+    }
+  }, [autoOpenAI, onAutoOpenConsumed]);
+
   const ActiveForm = SECTION_FORMS[activeStep.id];
-  // Progression past the first step requires clearing the completeness gate.
-  const canProceed = isValid || isFirstStep;
 
   const handleReset = () => {
     reset();
@@ -100,23 +110,16 @@ export function WizardContainer({ onChangeTemplate, onFinish }: WizardContainerP
             <ActiveForm />
 
             <div className="space-y-2 border-t pt-4">
-              {!canProceed && (
-                <p className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                  <Lock className="h-3 w-3" />
-                  Reach {MIN_COMPLETENESS_TO_PROCEED}% completeness to continue
-                  (currently {completenessPercent}%).
-                </p>
-              )}
               <div className="flex items-center justify-between">
                 <Button variant="outline" onClick={back} disabled={isFirstStep}>
                   <ArrowLeft className="h-4 w-4" /> Back
                 </Button>
                 {isLastStep ? (
-                  <Button onClick={() => onFinish?.()} disabled={!canProceed}>
+                  <Button onClick={() => onFinish?.()}>
                     Review & Export <FileDown className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <Button onClick={next} disabled={!canProceed}>
+                  <Button onClick={next}>
                     Next <ArrowRight className="h-4 w-4" />
                   </Button>
                 )}

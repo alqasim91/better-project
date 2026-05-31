@@ -4,7 +4,10 @@ import {
   Code2,
   FileText,
   HardHat,
+  History,
   Megaphone,
+  RotateCcw,
+  Sparkles,
   Stethoscope,
   type LucideIcon,
 } from "lucide-react";
@@ -37,13 +40,29 @@ function TemplateIcon({ name, className }: { name: string; className?: string })
 
 interface TemplateSelectorProps {
   onSelected?: () => void;
+  /** Start in the wizard with the AI draft flow open. Seeds the chosen template
+   *  (or a blank charter) first so AI has industry context. */
+  onStartWithAI?: () => void;
+  /** Project name of a saved draft, if one exists. Shows the resume banner. */
+  draftName?: string | null;
+  /** Restore the saved draft and enter the wizard. */
+  onResume?: () => void;
+  /** Discard the saved draft and start clean. */
+  onDiscardDraft?: () => void;
 }
 
 /**
  * Smart Template picker shown before the wizard. Selecting a template seeds
  * the charter store with industry defaults and advances to the form engine.
+ * The AI-first banner is the primary path: describe the project, let AI draft.
  */
-export function TemplateSelector({ onSelected }: TemplateSelectorProps) {
+export function TemplateSelector({
+  onSelected,
+  onStartWithAI,
+  draftName,
+  onResume,
+  onDiscardDraft,
+}: TemplateSelectorProps) {
   const templates = getAllTemplates();
   const selectTemplate = useCharterStore((s) => s.selectTemplate);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -54,12 +73,74 @@ export function TemplateSelector({ onSelected }: TemplateSelectorProps) {
     onSelected?.();
   };
 
+  const handleStartWithAI = () => {
+    // Seed whatever the user has highlighted, or a blank charter, so the AI
+    // draft has industry context to work from.
+    selectTemplate(selectedId ?? "blank");
+    onStartWithAI?.();
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Returning user: offer to resume the saved draft, or wipe it and start clean. */}
+      {draftName && (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <History className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                Pick up where you left off
+              </p>
+              <p className="text-sm text-amber-800">
+                You have a saved draft:{" "}
+                <span className="font-medium">{draftName}</span>. Starting a new
+                charter below will replace it.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button size="sm" onClick={() => onResume?.()}>
+              <History className="h-4 w-4" /> Resume draft
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onDiscardDraft?.()}
+            >
+              <RotateCcw className="h-4 w-4" /> Start over
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* AI-first hero — the primary path. */}
+      <div className="overflow-hidden rounded-xl border bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6 sm:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <Sparkles className="h-4 w-4" /> Fastest way to start
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Describe your project — AI drafts the charter
+            </h2>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              Give AI a project name and a sentence or two. It fills every
+              section for you, and you refine from there. No blank pages.
+            </p>
+          </div>
+          <Button size="lg" onClick={handleStartWithAI} className="shrink-0">
+            <Sparkles className="h-4 w-4" /> Draft with AI
+          </Button>
+        </div>
+      </div>
+
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold tracking-tight">Choose a starting point</h2>
-        <p className="text-muted-foreground">
+        <h3 className="text-lg font-semibold tracking-tight">
+          Or fill it in yourself
+        </h3>
+        <p className="text-sm text-muted-foreground">
           Pick a Smart Template to pre-fill industry defaults, or start blank.
+          You can still ask AI for help at any point.
         </p>
       </div>
 

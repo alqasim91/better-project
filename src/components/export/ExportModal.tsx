@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileDown, FileText, Globe, Loader2, AlertCircle } from "lucide-react";
+import { FileDown, FileText, Globe, Loader2, AlertCircle, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,47 +51,40 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             Export Charter
           </DialogTitle>
           <DialogDescription>
-            Download your charter as a polished PDF or an interactive HTML page.
+            Pick a format. You can always come back and export the other one.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tabs */}
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
-          <button
-            type="button"
-            onClick={() => setTab("pdf")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              tab === "pdf" ? "bg-background shadow-sm" : "hover:bg-background/50"
-            }`}
-          >
-            <FileText className="h-4 w-4" /> PDF Document
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("html")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              tab === "html" ? "bg-background shadow-sm" : "hover:bg-background/50"
-            }`}
-          >
-            <Globe className="h-4 w-4" /> Interactive HTML
-          </button>
+        {/* Format choice — stacked cards, PDF is the recommended default. */}
+        <div className="space-y-2">
+          <FormatCard
+            selected={tab === "pdf"}
+            onSelect={() => setTab("pdf")}
+            icon={<FileText className="h-5 w-5" />}
+            title="PDF document"
+            badge="Recommended"
+            description="A clean, print-ready file for sharing and sign-off."
+          />
+          <FormatCard
+            selected={tab === "html"}
+            onSelect={() => setTab("html")}
+            icon={<Globe className="h-5 w-5" />}
+            title="Web page"
+            description="An interactive page with a live timeline. Opens in any browser."
+          />
         </div>
 
-        {/* Tab content */}
-        <div className="space-y-4 py-2">
-          {tab === "pdf" ? (
-            <p className="text-sm text-muted-foreground">
-              Generates a print-ready A4 PDF with all charter sections, header,
-              footer, and page numbers. Great for stakeholder sign-off.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Generates a standalone HTML file with an embedded interactive
-                timeline. Open in any browser — no server required.
-              </p>
-              <ExportOptions options={htmlOptions} onChange={setHtmlOptions} />
-            </>
+        {/* Format-specific extras */}
+        <div className="space-y-4 py-1">
+          {tab === "html" && (
+            <details className="rounded-md border bg-muted/30 p-3 text-sm">
+              <summary className="cursor-pointer select-none font-medium">
+                What to include
+              </summary>
+              <div className="pt-3">
+                <ExportOptions options={htmlOptions} onChange={setHtmlOptions} />
+              </div>
+            </details>
           )}
 
           {progress && (
@@ -136,5 +129,50 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface FormatCardProps {
+  selected: boolean;
+  onSelect: () => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  badge?: string;
+}
+
+/** A selectable format row in the export dialog. */
+function FormatCard({
+  selected,
+  onSelect,
+  icon,
+  title,
+  description,
+  badge,
+}: FormatCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+        selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent"
+      }`}
+    >
+      <span className="mt-0.5 text-primary">{icon}</span>
+      <span className="flex-1">
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-medium">{title}</span>
+          {badge && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      {selected && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+    </button>
   );
 }

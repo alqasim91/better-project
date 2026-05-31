@@ -16,7 +16,7 @@ import { useCompletenessValidation } from "@/hooks/useValidation";
 export function FinalReview() {
   const { isExportReady } = useCompletenessValidation();
   const [exportOpen, setExportOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   return (
     <div className="space-y-6">

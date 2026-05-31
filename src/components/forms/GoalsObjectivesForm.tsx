@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ListField } from "@/components/forms/fields/ListField";
+import { InfoHint } from "@/components/ui/InfoHint";
 import type { Objective, Priority } from "@/types/charter";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
@@ -43,7 +44,10 @@ export function GoalsObjectivesForm() {
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="visionStatement">Vision statement</Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="visionStatement">Vision statement</Label>
+          <InfoHint label="The future you're aiming for — the 'where we want to be.' One inspiring sentence, not a to-do. Example: 'Customers solve their own issues without ever calling support.'" />
+        </div>
         <Textarea
           id="visionStatement"
           rows={2}
@@ -54,7 +58,10 @@ export function GoalsObjectivesForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="businessCase">Business case</Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="businessCase">Business case</Label>
+          <InfoHint label="Why it's worth doing now — the cost, payoff, or risk of not doing it. The 'why fund this.' Example: 'Support costs $40k/month; self-service could cut that in half within a year.'" />
+        </div>
         <Textarea
           id="businessCase"
           rows={3}
@@ -66,7 +73,10 @@ export function GoalsObjectivesForm() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label>Objectives</Label>
+          <div className="flex items-center gap-1">
+            <Label>Objectives</Label>
+            <InfoHint label="Specific, measurable things the project will deliver — the 'what we'll do.' Each pairs with a success metric. Example: 'Launch a self-service help center' (metric: 'deflect 30% of tickets')." />
+          </div>
           <Button type="button" size="sm" variant="secondary" onClick={addObjective}>
             <Plus className="h-4 w-4" /> Add objective
           </Button>

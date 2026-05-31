@@ -27,26 +27,17 @@ export function clearPersistedCharter(): void {
 }
 
 /**
- * Auto-saves the charter to localStorage on change (debounced) and hydrates
- * from storage once on mount. Returns nothing — it is a side-effect hook.
+ * Auto-saves the charter to localStorage on change (debounced).
+ *
+ * Note: this hook does NOT hydrate on mount. Restoring a saved draft is an
+ * explicit user choice ("Resume draft" on the landing screen) so that picking
+ * a fresh template or AI draft is never silently overwritten by stored data.
  */
 export function useFormPersistence() {
   const charter = useCharterStore((s) => s.charter);
-  const setCharter = useCharterStore((s) => s.setCharter);
-  const hydrated = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Hydrate once on mount.
   useEffect(() => {
-    if (hydrated.current) return;
-    hydrated.current = true;
-    const persisted = loadPersistedCharter();
-    if (persisted) setCharter(persisted);
-  }, [setCharter]);
-
-  // Debounced save on every charter change (after hydration).
-  useEffect(() => {
-    if (!hydrated.current) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {

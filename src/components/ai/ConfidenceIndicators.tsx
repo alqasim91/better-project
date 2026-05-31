@@ -4,9 +4,9 @@ import { confidenceBand, type ConfidenceScore } from "@/types/ai";
 import { cn } from "@/lib/utils";
 
 const BAND_STYLE = {
-  high: { variant: "success" as const, Icon: ShieldCheck, label: "High confidence" },
-  medium: { variant: "warning" as const, Icon: ShieldAlert, label: "Needs review" },
-  low: { variant: "destructive" as const, Icon: ShieldX, label: "Low confidence" },
+  high: { variant: "success" as const, Icon: ShieldCheck, label: "Looks solid" },
+  medium: { variant: "warning" as const, Icon: ShieldAlert, label: "Worth a glance" },
+  low: { variant: "destructive" as const, Icon: ShieldX, label: "Double-check — AI guessed" },
 };
 
 interface ConfidenceBadgeProps {

@@ -2,6 +2,7 @@ import { useCharterStore } from "@/stores/charterStore";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { InfoHint } from "@/components/ui/InfoHint";
 
 /** Section 1 — high-level identity and timeframe of the project. */
 export function ProjectBasicsForm() {
@@ -66,12 +67,15 @@ export function ProjectBasicsForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="summary">Executive summary</Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="summary">Executive summary</Label>
+          <InfoHint label="The short overview a busy exec reads first — what the project is and why it matters, in plain terms. Example: 'Redesign the customer portal to cut support tickets and improve self-service.' (The Vision and Business case in the next step go deeper.)" />
+        </div>
         <Textarea
           id="summary"
           rows={4}
           value={basics.summary}
-          placeholder="One paragraph describing what this project will achieve and why."
+          placeholder="One paragraph: what this project will achieve and why it matters."
           onChange={(e) => set({ summary: e.target.value })}
         />
       </div>

@@ -44,16 +44,16 @@ export function ReviewSuggestions({
       return (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <AlertTriangle className="mr-1 inline h-4 w-4" />
-          Confidence scoring is unavailable — please review each generated section
-          carefully before applying.
+          We couldn't check the AI's confidence this time — give each section a
+          quick read before you apply it.
         </div>
       );
     }
     return (
       <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
         <Check className="mr-1 inline h-4 w-4" />
-        No low-confidence extrapolations — all {scoredCount} sections are well
-        grounded.
+        All {scoredCount} sections look solid — AI was confident in everything it
+        drafted.
       </div>
     );
   }
@@ -61,8 +61,9 @@ export function ReviewSuggestions({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        {lowConfidence.length} section{lowConfidence.length === 1 ? "" : "s"} need
-        a closer look before accepting.
+        AI wasn't fully sure about {lowConfidence.length} section
+        {lowConfidence.length === 1 ? "" : "s"} — take a quick look before
+        accepting. Everything else will be applied automatically.
       </p>
 
       {flagged.map((section) => {
