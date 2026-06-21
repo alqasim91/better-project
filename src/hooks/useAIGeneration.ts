@@ -5,7 +5,11 @@ import type {
   GeneratedSection,
   GenerationMetadata,
 } from "@/types/ai";
-import { generateCharterDraft } from "@/services/ai/charterGenerator";
+import {
+  generateCharterDraft,
+  generateCharterDraftSequential,
+  type SequentialProgress,
+} from "@/services/ai/charterGenerator";
 import { scoreConfidence } from "@/services/ai/confidenceScorer";
 import { mergeSectionIntoCharter } from "@/lib/applyGenerated";
 import { useCharterStore } from "@/stores/charterStore";
@@ -30,6 +34,9 @@ export function useCharterGeneration() {
   const [metadata, setMetadata] = useState<GenerationMetadata | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  /** When non-null, the run is in sequential mode and this is the current
+   * section being drafted. UI uses it to show "Section X of 7" progress. */
+  const [seqProgress, setSeqProgress] = useState<SequentialProgress | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Live elapsed-ms counter while a request is in flight.
@@ -56,7 +63,38 @@ export function useCharterGeneration() {
       setError(null);
       setSections([]);
       setMetadata(null);
+      setSeqProgress(null);
+
+      // Sequential mode: when the user has BYOK pointed at a local model
+      // runner (custom baseUrl = LM Studio / Ollama / llama.cpp), generating
+      // all 7 sections in one call risks timeouts and JSON truncation. Fan
+      // out to 7 small calls instead. Per-section refinement (onlySectionId)
+      // is already small so it always uses the one-shot path.
+      const byok = getActiveByokConfig();
+      const useSequential =
+        !extra.onlySectionId && byok !== null && Boolean(byok.baseUrl?.trim());
+
       try {
+        if (useSequential) {
+          const baseCharter =
+            extra.existingCharter ?? useCharterStore.getState().charter;
+          const result = await generateCharterDraftSequential(
+            inputs,
+            baseCharter,
+            {
+              templateId: selectTemplateId,
+              templateContext: extra.templateContext,
+              onProgress: (p) => setSeqProgress(p),
+              onSection: (s) => setSections((prev) => [...prev, s]),
+            },
+          );
+          // Replace with the final ordered list (the streaming setState above
+          // already showed each one as it arrived).
+          setSections(result.sections);
+          setMetadata(result.metadata);
+          return result.sections;
+        }
+
         const result = await generateCharterDraft(inputs, {
           templateId: selectTemplateId,
           templateContext: extra.templateContext,
@@ -71,6 +109,7 @@ export function useCharterGeneration() {
         return [];
       } finally {
         setIsGenerating(false);
+        setSeqProgress(null);
       }
     },
     [selectTemplateId],
@@ -94,6 +133,7 @@ export function useCharterGeneration() {
     setMetadata(null);
     setError(null);
     setElapsedMs(0);
+    setSeqProgress(null);
   }, []);
 
   return {
@@ -105,6 +145,7 @@ export function useCharterGeneration() {
     metadata,
     error,
     elapsedMs,
+    seqProgress,
   };
 }
 

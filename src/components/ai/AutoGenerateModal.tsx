@@ -209,13 +209,48 @@ export function AutoGenerateModal({ open, onOpenChange }: AutoGenerateModalProps
             )}
 
             {generation.isGenerating && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {hasExistingContent ? "Refining your charter" : "Drafting your charter"}
-                {" — "}
-                <span className="font-mono">
-                  {(generation.elapsedMs / 1000).toFixed(1)}s
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {generation.seqProgress ? (
+                    <>
+                      Drafting <span className="font-medium">{generation.seqProgress.label}</span>
+                      {" "}
+                      <span className="text-xs">
+                        ({generation.seqProgress.index + 1} of {generation.seqProgress.total})
+                      </span>
+                      {" — "}
+                      <span className="font-mono">
+                        {(generation.elapsedMs / 1000).toFixed(1)}s
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {hasExistingContent ? "Refining your charter" : "Drafting your charter"}
+                      {" — "}
+                      <span className="font-mono">
+                        {(generation.elapsedMs / 1000).toFixed(1)}s
+                      </span>
+                    </>
+                  )}
+                </div>
+                {generation.seqProgress && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{
+                          width: `${(generation.seqProgress.index / generation.seqProgress.total) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    {generation.sections.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Completed: {generation.sections.map((s) => s.title).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
