@@ -1,26 +1,24 @@
-import { useCallback, useState } from "react";
-import type { Charter, MinimalInputs } from "@/types/charter";
-import type { ConfidenceScore, GeneratedSection } from "@/types/ai";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Charter, CharterSectionId, MinimalInputs } from "@/types/charter";
+import type {
+  ConfidenceScore,
+  GeneratedSection,
+  GenerationMetadata,
+} from "@/types/ai";
 import { generateCharterDraft } from "@/services/ai/charterGenerator";
 import { scoreConfidence } from "@/services/ai/confidenceScorer";
 import { mergeSectionIntoCharter } from "@/lib/applyGenerated";
 import { useCharterStore } from "@/stores/charterStore";
+import { getActiveByokConfig } from "@/stores/byokStore";
 
-export interface GenerationProgress {
-  step: number;
-  total: number;
-  label: string;
+export interface GenerateExtra {
+  templateContext?: string;
+  existingCharter?: Charter;
+  onlySectionId?: CharterSectionId;
 }
 
-const PROGRESS_STEPS = [
-  "Analyzing inputs…",
-  "Drafting charter sections…",
-  "Structuring output…",
-  "Done",
-];
-
 /**
- * Drives AI charter generation: runs the draft, tracks staged progress, and
+ * Drives AI charter generation: runs the draft, tracks elapsed time, and
  * applies accepted sections into the charter store.
  */
 export function useCharterGeneration() {
@@ -28,34 +26,48 @@ export function useCharterGeneration() {
   const setCharter = useCharterStore((s) => s.setCharter);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [sections, setSections] = useState<GeneratedSection[]>([]);
+  const [metadata, setMetadata] = useState<GenerationMetadata | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Live elapsed-ms counter while a request is in flight.
+  useEffect(() => {
+    if (!isGenerating) {
+      if (tickRef.current) clearInterval(tickRef.current);
+      tickRef.current = null;
+      return;
+    }
+    const startedAt = performance.now();
+    setElapsedMs(0);
+    tickRef.current = setInterval(() => {
+      setElapsedMs(Math.round(performance.now() - startedAt));
+    }, 100);
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+      tickRef.current = null;
+    };
+  }, [isGenerating]);
 
   const generate = useCallback(
-    async (
-      inputs: MinimalInputs,
-      templateContext?: string,
-      existingCharter?: Charter,
-    ) => {
+    async (inputs: MinimalInputs, extra: GenerateExtra = {}) => {
       setIsGenerating(true);
       setError(null);
       setSections([]);
-      setProgress({ step: 1, total: PROGRESS_STEPS.length, label: PROGRESS_STEPS[0] });
+      setMetadata(null);
       try {
-        setProgress({ step: 2, total: PROGRESS_STEPS.length, label: PROGRESS_STEPS[1] });
         const result = await generateCharterDraft(inputs, {
           templateId: selectTemplateId,
-          templateContext,
-          existingCharter,
+          templateContext: extra.templateContext,
+          existingCharter: extra.existingCharter,
+          onlySectionId: extra.onlySectionId,
         });
-        setProgress({ step: 3, total: PROGRESS_STEPS.length, label: PROGRESS_STEPS[2] });
-        setSections(result);
-        setProgress({ step: 4, total: PROGRESS_STEPS.length, label: PROGRESS_STEPS[3] });
-        return result;
+        setSections(result.sections);
+        setMetadata(result.metadata);
+        return result.sections;
       } catch (err) {
         setError((err as Error).message);
-        setProgress(null);
         return [];
       } finally {
         setIsGenerating(false);
@@ -79,11 +91,21 @@ export function useCharterGeneration() {
 
   const reset = useCallback(() => {
     setSections([]);
-    setProgress(null);
+    setMetadata(null);
     setError(null);
+    setElapsedMs(0);
   }, []);
 
-  return { generate, applySections, reset, isGenerating, progress, sections, error };
+  return {
+    generate,
+    applySections,
+    reset,
+    isGenerating,
+    sections,
+    metadata,
+    error,
+    elapsedMs,
+  };
 }
 
 /**
@@ -117,8 +139,10 @@ export function useConfidenceScoring() {
     [],
   );
 
-  /** Score many sections in parallel. Resilient: one section's failure
-   * doesn't drop the others. */
+  /** Score sections. Hosted mode runs in parallel for speed; local mode
+   * (single local model) runs sequentially so requests don't queue and time
+   * out. Either way, one section's failure doesn't drop the others, and
+   * scores stream into state as they resolve. */
   const scoreAll = useCallback(
     async (
       toScore: GeneratedSection[],
@@ -127,24 +151,41 @@ export function useConfidenceScoring() {
     ) => {
       setIsScoring(true);
       setError(null);
+      const results: ConfidenceScore[] = [];
+      const errors: string[] = [];
+      const isLocal = import.meta.env.VITE_LOCAL_AI === "true";
+      // BYOK keys typically have low rate limits; serialize scoring to avoid
+      // 429s, same as local-model mode. Hosted mode keeps parallelism.
+      const isByok = getActiveByokConfig() !== null;
+      const serialize = isLocal || isByok;
       try {
-        const settled = await Promise.allSettled(
-          toScore.map((s) => scoreConfidence(s, sources, existingCharter)),
-        );
-        const results: ConfidenceScore[] = [];
-        const errors: string[] = [];
-        settled.forEach((r) => {
-          if (r.status === "fulfilled") {
-            results.push(r.value);
-          } else {
-            errors.push(r.reason?.message ?? String(r.reason));
+        if (serialize) {
+          for (const section of toScore) {
+            try {
+              const r = await scoreConfidence(section, sources, existingCharter);
+              results.push(r);
+              setScores((prev) => ({ ...prev, [r.sectionId]: r }));
+            } catch (err) {
+              errors.push((err as Error).message);
+            }
           }
-        });
-        setScores((prev) => {
-          const next = { ...prev };
-          results.forEach((r) => (next[r.sectionId] = r));
-          return next;
-        });
+        } else {
+          const settled = await Promise.allSettled(
+            toScore.map((s) => scoreConfidence(s, sources, existingCharter)),
+          );
+          settled.forEach((r) => {
+            if (r.status === "fulfilled") {
+              results.push(r.value);
+            } else {
+              errors.push(r.reason?.message ?? String(r.reason));
+            }
+          });
+          setScores((prev) => {
+            const next = { ...prev };
+            results.forEach((r) => (next[r.sectionId] = r));
+            return next;
+          });
+        }
         if (errors.length > 0) {
           setError(
             `Scoring failed for ${errors.length} of ${toScore.length} section(s). ${errors[0]}`,

@@ -15,6 +15,7 @@ import { CompletenessChecker } from "@/components/validation/CompletenessChecker
 import { SectionStatusBar } from "@/components/validation/SectionStatusBar";
 import { MissingFieldsAlert } from "@/components/validation/MissingFieldsAlert";
 import { AutoGenerateModal } from "@/components/ai/AutoGenerateModal";
+import { SectionAiAssist } from "@/components/ai/SectionAiAssist";
 import { ProjectBasicsForm } from "@/components/forms/ProjectBasicsForm";
 import { GoalsObjectivesForm } from "@/components/forms/GoalsObjectivesForm";
 import { StakeholdersForm } from "@/components/forms/StakeholdersForm";
@@ -107,6 +108,7 @@ export function WizardContainer({
           </CardHeader>
           <CardContent className="space-y-6">
             <MissingFieldsAlert />
+            <SectionAiAssist sectionId={activeStep.id} />
             <ActiveForm />
 
             <div className="space-y-2 border-t pt-4">

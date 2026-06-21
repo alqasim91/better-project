@@ -1,10 +1,37 @@
-import type { Charter, MinimalInputs } from "@/types/charter";
+import type { Charter, CharterSectionId, MinimalInputs } from "@/types/charter";
 import type { GeneratedSection } from "@/types/ai";
 
 export interface ChatPrompt {
   system: string;
   user: string;
 }
+
+const SECTION_DATA_SHAPE: Record<CharterSectionId, string> = {
+  basics:
+    "{ projectName, sponsor, projectManager, startDate (ISO), targetEndDate (ISO), summary }",
+  goals:
+    "{ visionStatement, businessCase, objectives: [{ statement, metric, priority }], successCriteria: string[] }",
+  stakeholders:
+    '{ stakeholders: [{ name, role, category: "internal"|"external"|"regulatory", influence: 1-5, interest: 1-5 }] }',
+  scope:
+    "{ inScope: string[], outOfScope: string[], constraints: [{ description, type }] }",
+  risks:
+    "{ risks: [{ description, probability, impact, mitigation }], assumptions: string[], dependencies: string[] }",
+  deliverables:
+    "{ deliverables: [{ name, description, acceptanceCriteria, dueDate (ISO) }] }",
+  timeline:
+    '{ milestones: [{ title, date (ISO), type: "milestone"|"deliverable"|"review" }], totalBudget: number, currency, budgetNotes }',
+};
+
+const SECTION_LABEL: Record<CharterSectionId, string> = {
+  basics: "Project Basics",
+  goals: "Goals & Objectives",
+  stakeholders: "Stakeholders",
+  scope: "Scope & Constraints",
+  risks: "Risks & Assumptions",
+  deliverables: "Deliverables",
+  timeline: "Timeline & Budget",
+};
 
 /**
  * JSON schema description embedded in the generation prompt so the model
@@ -54,16 +81,60 @@ function hasMeaningfulContent(charter?: Charter): boolean {
  * Build the model prompt that drafts or refines a project charter.
  * If `existingCharter` already has user content, the model is told to
  * preserve and polish it rather than regenerate from scratch.
+ * If `onlySectionId` is provided, the model is constrained to return a
+ * single section — used by the per-section "improve with AI" flow.
  */
 export function buildGenerationPrompt(
   minimalInputs: MinimalInputs,
   templateContext?: string,
   existingCharter?: Charter,
+  onlySectionId?: CharterSectionId,
 ): ChatPrompt {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Single-section path overrides everything else. Always treated as a refine
+  // (we send the current charter so the model sees context) but the output is
+  // constrained to one section.
+  if (onlySectionId) {
+    const shape = SECTION_DATA_SHAPE[onlySectionId];
+    const label = SECTION_LABEL[onlySectionId];
+    const system = [
+      "You are an expert project management consultant improving ONE section of an in-progress project charter.",
+      `Today's date is ${today}. All generated dates MUST be today or in the future.`,
+      `You will improve ONLY the "${onlySectionId}" (${label}) section. Do NOT touch any other section.`,
+      "Rules:",
+      "1. PRESERVE every concrete fact the user already entered in this section: names, dates, numbers. Do not overwrite them with invented values.",
+      "2. REPHRASE rough notes into clear, professional charter language.",
+      "3. FILL empty fields and extend short lists with plausible, industry-appropriate detail.",
+      "4. Use the OTHER sections of the charter as context to keep this section consistent (e.g. stakeholders should align with project basics; risks should align with scope).",
+      "5. Never invent specific named people, vendors, or precise financial figures.",
+      `Return ONLY valid JSON of the form: { "sections": [ { "sectionId": "${onlySectionId}", "title": "${label}", "summary": "one sentence on what changed", "data": ${shape} } ] }`,
+      "Do not include any other sections. No markdown fences. No commentary.",
+    ].join("\n\n");
+
+    const user = [
+      "FULL CHARTER FOR CONTEXT (only improve the marked section):",
+      JSON.stringify(existingCharter ?? {}, null, 2),
+      "",
+      `SECTION TO IMPROVE: ${onlySectionId} (${label})`,
+      "",
+      "ADDITIONAL CONTEXT FROM USER:",
+      `- Project name: ${minimalInputs.projectName || "(use what's in the charter)"}`,
+      minimalInputs.goals ? `- Notes: ${minimalInputs.goals}` : null,
+      minimalInputs.industry ? `- Industry: ${minimalInputs.industry}` : null,
+      templateContext ? `- Template context: ${templateContext}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return { system, user };
+  }
+
   if (hasMeaningfulContent(existingCharter)) {
     const system = [
       "You are an expert project management consultant refining an in-progress project charter.",
       "Your job is to POLISH and EXTEND what the user has already written — not replace it.",
+      `Today's date is ${today}. All generated dates MUST be today or in the future — never in the past. If the user has not specified a start date, default it to today.`,
       "Rules:",
       "1. PRESERVE every concrete fact the user provided: names, dates, numbers, vendors, specific wording of objectives. Do not change a person's name, swap a date, or alter a budget number.",
       "2. REPHRASE rough notes and incomplete sentences into clear, professional charter language while keeping the user's meaning.",
@@ -95,6 +166,7 @@ export function buildGenerationPrompt(
 
   const system = [
     "You are an expert project management consultant who drafts complete, realistic project charters.",
+    `Today's date is ${today}. All generated dates MUST be today or in the future — never in the past. Default the project start date to today unless the user specifies otherwise.`,
     "Extrapolate sensible, industry-appropriate detail from sparse inputs, but never invent specific people, vendors, or figures that imply false precision.",
     "Prefer ISO 8601 dates and conservative, defensible estimates.",
     GENERATION_OUTPUT_CONTRACT,
@@ -108,6 +180,50 @@ export function buildGenerationPrompt(
     templateContext ? `Template context: ${templateContext}` : null,
     "",
     "Draft every section of the charter. Where you extrapolate beyond the inputs, keep it plausible and note the assumption in the section summary.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return { system, user };
+}
+
+/**
+ * Build a prompt asking the AI to suggest concrete engagement strategy
+ * for one stakeholder, grounded in their power/interest quadrant and the
+ * surrounding project context.
+ */
+export interface StakeholderForSuggestion {
+  name: string;
+  role: string;
+  category: string;
+  influence: number;
+  interest: number;
+  quadrant: string;
+}
+
+export function buildEngagementSuggestionPrompt(
+  stakeholder: StakeholderForSuggestion,
+  projectContext: { name: string; summary: string; goals: string },
+): ChatPrompt {
+  const system = [
+    "You are an expert project management consultant advising on stakeholder engagement.",
+    "Given one stakeholder, their power/interest quadrant, and the project context, return a concrete engagement strategy in 3 specific bullets.",
+    "Be specific and actionable. Avoid generic advice. Reference the project context where useful.",
+    'Return ONLY valid JSON: { "summary": "one-line strategy", "actions": [string, string, string] }. No markdown, no commentary.',
+  ].join("\n\n");
+
+  const user = [
+    `PROJECT: ${projectContext.name || "(unnamed)"}`,
+    projectContext.summary ? `Summary: ${projectContext.summary}` : null,
+    projectContext.goals ? `Goals: ${projectContext.goals}` : null,
+    "",
+    "STAKEHOLDER:",
+    `- Name: ${stakeholder.name || "(unnamed)"}`,
+    `- Role: ${stakeholder.role || "(unspecified)"}`,
+    `- Category: ${stakeholder.category}`,
+    `- Influence: ${stakeholder.influence}/5`,
+    `- Interest: ${stakeholder.interest}/5`,
+    `- Quadrant: ${stakeholder.quadrant}`,
   ]
     .filter(Boolean)
     .join("\n");

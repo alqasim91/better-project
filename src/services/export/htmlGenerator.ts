@@ -1,6 +1,11 @@
 import type { Charter } from "@/types/charter";
 import { SECTION_LABELS } from "@/types/charter";
 import { formatISODate, formatCurrency } from "@/lib/exportUtils";
+// Import vis-timeline assets as raw strings so the export is fully self-contained
+// (no CDN dependency — works offline / from file://).
+import visTimelineJs from "@/assets/vis-timeline/vis-timeline.min.js?raw";
+import visTimelineCss from "@/assets/vis-timeline/vis-timeline.min.css?raw";
+
 export interface HTMLExportOptions {
   includeTimeline: boolean;
   includeStakeholderMap: boolean;
@@ -62,8 +67,8 @@ export function generateHTML(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${esc(name)}</title>
-${opts.includeTimeline ? `<link href="https://unpkg.com/vis-timeline@7.7.3/styles/vis-timeline-graph2d.min.css" rel="stylesheet">
-<script src="https://unpkg.com/vis-timeline@7.7.3/standalone/umd/vis-timeline-graph2d.min.js"><\/script>` : ""}
+${opts.includeTimeline ? `<style>${visTimelineCss}</style>
+<script>${visTimelineJs}<\/script>` : ""}
 <style>
   :root { --primary: #4f46e5; --bg: #f8fafc; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -83,7 +88,17 @@ ${opts.includeTimeline ? `<link href="https://unpkg.com/vis-timeline@7.7.3/style
   .type-milestone { background: #6366f1; color: #fff; border-color: #4f46e5; }
   .type-deliverable { background: #10b981; color: #fff; border-color: #059669; }
   .type-review { background: #f59e0b; color: #fff; border-color: #d97706; }
-  @media print { body { padding: 16px; } h1 { font-size: 1.3rem; } }
+  .milestone-list { list-style: none; padding: 0; margin: 8px 0 16px; }
+  .milestone-list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .milestone-list li:last-child { border-bottom: none; }
+  .ml-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .ml-dot.milestone { background: #6366f1; }
+  .ml-dot.deliverable { background: #10b981; }
+  .ml-dot.review { background: #f59e0b; }
+  .ml-date { color: var(--muted); font-size: 0.8rem; margin-left: 8px; }
+  /* Interactive timeline visible on screen, static list visible in print */
+  .timeline-static { display: none; }
+  @media print { body { padding: 16px; } h1 { font-size: 1.3rem; } #timeline { display: none; } .timeline-static { display: block; } }
 </style>
 </head>
 <body>
@@ -145,8 +160,11 @@ ${opts.includeTimeline && timelineItems.length > 0 ? `
 <script>
 var items = new vis.DataSet(${JSON.stringify(timelineItems)});
 new vis.Timeline(document.getElementById("timeline"), items, { height: "300px", margin: { item: 10 } }).fit();
-<\/script>` : charter.timeline.milestones.length > 0 ? `
-<ul>${charter.timeline.milestones.map((m) => `<li><strong>${esc(m.title)}</strong> — ${formatISODate(m.date)} (${m.type})</li>`).join("\n")}</ul>` : "<p>No milestones defined.</p>"}
+<\/script>` : ""}
+${charter.timeline.milestones.length > 0 ? `
+<ul class="milestone-list${opts.includeTimeline && timelineItems.length > 0 ? " timeline-static" : ""}">
+${charter.timeline.milestones.map((m) => `<li><span class="ml-dot ${m.type}"></span><strong>${esc(m.title)}</strong><span class="ml-date">${formatISODate(m.date)} · ${m.type}</span></li>`).join("\n")}
+</ul>` : "<p>No milestones defined.</p>"}
 
 ${opts.includeBudgetDetails ? `
 <div class="label">Budget</div>

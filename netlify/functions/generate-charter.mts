@@ -13,7 +13,7 @@ export default async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { inputs, templateContext, existingCharter } = await req.json();
+    const { inputs, templateContext, existingCharter, onlySectionId } = await req.json();
     if (!inputs) {
       return jsonResponse({ error: "Missing 'inputs'" }, 400);
     }
@@ -22,6 +22,7 @@ export default async (req: Request): Promise<Response> => {
       inputs,
       templateContext,
       existingCharter,
+      onlySectionId,
     );
     const result = await chatCompletion([
       { role: "system", content: system },

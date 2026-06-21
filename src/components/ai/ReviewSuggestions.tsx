@@ -12,6 +12,9 @@ interface ReviewSuggestionsProps {
   onDecision: (sectionId: string, action: SuggestionAction) => void;
   /** Threshold under which a section is treated as a low-confidence extrapolation. */
   threshold?: number;
+  /** Whether confidence scoring is still in flight. Used to suppress the
+   * "no scores" warning until the scorer has actually finished. */
+  isScoring?: boolean;
 }
 
 /**
@@ -25,6 +28,7 @@ export function ReviewSuggestions({
   decisions,
   onDecision,
   threshold = 50,
+  isScoring = false,
 }: ReviewSuggestionsProps) {
   const lowConfidence = sections.filter((s) => {
     const score = scores[s.sectionId];
@@ -41,6 +45,13 @@ export function ReviewSuggestions({
 
   if (flagged.length === 0) {
     if (noScoresAtAll) {
+      if (isScoring) {
+        return (
+          <div className="rounded-md border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+            Scoring each section… this can take a minute on a local model.
+          </div>
+        );
+      }
       return (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <AlertTriangle className="mr-1 inline h-4 w-4" />

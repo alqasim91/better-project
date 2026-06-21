@@ -1,0 +1,173 @@
+import { useState } from "react";
+import { Sparkles, Loader2, AlertCircle, Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useCharterStore } from "@/stores/charterStore";
+import { useCharterGeneration } from "@/hooks/useAIGeneration";
+import { getTemplateById } from "@/lib/templateRegistry";
+import {
+  SECTION_LABELS,
+  type CharterSectionId,
+  type MinimalInputs,
+} from "@/types/charter";
+
+interface Props {
+  sectionId: CharterSectionId;
+}
+
+/**
+ * Compact AI helper rendered above each section form. Lets the user ask AI
+ * to improve / fill / extend just THIS section, then preview the change
+ * and apply or discard before it touches the charter.
+ */
+export function SectionAiAssist({ sectionId }: Props) {
+  const charter = useCharterStore((s) => s.charter);
+  const template = charter.templateId
+    ? getTemplateById(charter.templateId)
+    : undefined;
+  const generation = useCharterGeneration();
+
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  const handleRun = async () => {
+    const inputs: MinimalInputs = {
+      projectName: charter.basics.projectName,
+      goals: notes,
+      stakeholders: "",
+      industry: template?.industry,
+    };
+    await generation.generate(inputs, {
+      templateContext: template?.description,
+      existingCharter: charter,
+      onlySectionId: sectionId,
+    });
+  };
+
+  const handleApply = () => {
+    // The single-section generation returns exactly one section (the model is
+    // told to). Apply it (mergeSectionIntoCharter is a per-section merge) and
+    // collapse the panel.
+    generation.applySections(generation.sections);
+    generation.reset();
+    setOpen(false);
+    setNotes("");
+  };
+
+  const handleDiscard = () => {
+    generation.reset();
+  };
+
+  const generated = generation.sections[0];
+
+  return (
+    <div className="rounded-md border border-dashed bg-muted/20">
+      {!open ? (
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <p className="text-xs text-muted-foreground">
+            Need a hand with {SECTION_LABELS[sectionId]}?
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setOpen(true)}
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Improve with AI
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">
+                Improve {SECTION_LABELS[sectionId]} with AI
+              </p>
+              <p className="text-xs text-muted-foreground">
+                AI will preserve every fact you've entered and only fill gaps
+                or rephrase rough notes.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                setOpen(false);
+                setNotes("");
+                generation.reset();
+              }}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {!generated && !generation.isGenerating && (
+            <>
+              <Textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Anything specific AI should know? (optional)"
+              />
+              <div className="flex justify-end">
+                <Button type="button" size="sm" onClick={handleRun}>
+                  <Sparkles className="h-3.5 w-3.5" /> Run
+                </Button>
+              </div>
+            </>
+          )}
+
+          {generation.isGenerating && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Working on this section —{" "}
+              <span className="font-mono">
+                {(generation.elapsedMs / 1000).toFixed(1)}s
+              </span>
+            </div>
+          )}
+
+          {generation.error && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {generation.error}
+            </div>
+          )}
+
+          {generated && (
+            <div className="space-y-2 rounded-md border bg-background p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                AI's note:
+              </p>
+              <p className="text-sm">{generated.summary}</p>
+              {generation.metadata && (
+                <p className="text-xs text-muted-foreground">
+                  Generated by{" "}
+                  <span className="font-mono">
+                    {generation.metadata.model}
+                  </span>{" "}
+                  in {(generation.elapsedMs / 1000).toFixed(1)}s
+                </p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDiscard}
+                >
+                  <X className="h-3.5 w-3.5" /> Discard
+                </Button>
+                <Button type="button" size="sm" onClick={handleApply}>
+                  <Check className="h-3.5 w-3.5" /> Apply to section
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

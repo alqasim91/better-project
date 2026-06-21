@@ -3,6 +3,7 @@ import { Grid2x2, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InfluenceMatrix } from "@/components/stakeholders/InfluenceMatrix";
 import { RelationshipGraph } from "@/components/stakeholders/RelationshipGraph";
+import { EngagementSuggestions } from "@/components/stakeholders/EngagementSuggestions";
 
 type MapView = "matrix" | "network";
 
@@ -33,6 +34,8 @@ export function StakeholderMapper() {
       </div>
 
       {view === "matrix" ? <InfluenceMatrix /> : <RelationshipGraph />}
+
+      <EngagementSuggestions />
     </div>
   );
 }

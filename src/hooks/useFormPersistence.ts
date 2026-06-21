@@ -1,37 +1,43 @@
 import { useEffect, useRef } from "react";
 import { useCharterStore } from "@/stores/charterStore";
-import { charterSchema } from "@/lib/validationSchemas";
 import type { Charter } from "@/types/charter";
+import {
+  saveCharter,
+  loadCharter,
+  listCharters,
+  deleteCharter,
+} from "@/lib/charterLibrary";
 
-const STORAGE_KEY = "better-project:charter";
 const DEBOUNCE_MS = 600;
 
-/** Read a previously persisted charter from localStorage, if valid. */
+/**
+ * Return the most-recently-edited charter, if any. Used by the landing
+ * screen's "Resume draft" affordance. Reads through the library so legacy
+ * single-charter data is migrated transparently.
+ */
 export function loadPersistedCharter(): Charter | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = charterSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? (parsed.data as Charter) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearPersistedCharter(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
+  const all = listCharters();
+  if (all.length === 0) return null;
+  return loadCharter(all[0].id);
 }
 
 /**
- * Auto-saves the charter to localStorage on change (debounced).
+ * Delete the most-recently-edited charter from the library. Used by the
+ * landing-page "Discard draft" affordance — the in-memory store at that
+ * point is a fresh blank charter (different id), so we target the saved
+ * draft directly by recency.
+ */
+export function clearPersistedCharter(): void {
+  const all = listCharters();
+  if (all.length > 0) deleteCharter(all[0].id);
+}
+
+/**
+ * Auto-saves the charter to the library on change (debounced).
  *
- * Note: this hook does NOT hydrate on mount. Restoring a saved draft is an
- * explicit user choice ("Resume draft" on the landing screen) so that picking
- * a fresh template or AI draft is never silently overwritten by stored data.
+ * Does NOT hydrate on mount — restoring a saved charter is an explicit user
+ * choice (Resume / Open from library) so a fresh AI draft or new template
+ * never silently overwrites stored data.
  */
 export function useFormPersistence() {
   const charter = useCharterStore((s) => s.charter);
@@ -40,11 +46,7 @@ export function useFormPersistence() {
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(charter));
-      } catch {
-        /* storage full or unavailable — skip */
-      }
+      saveCharter(charter);
     }, DEBOUNCE_MS);
 
     return () => {

@@ -11,3 +11,15 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Build artifacts
+dist-local
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# Local working notes (not part of the codebase)
+local-build-notes.md
+session-notes-*.md
+upgrade-*.md
+local\ better\ project.html
