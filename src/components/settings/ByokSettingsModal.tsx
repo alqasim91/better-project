@@ -134,9 +134,7 @@ export function ByokSettingsModal({ open, onOpenChange }: Props) {
           },
           { role: "user", content: "ping" },
         ],
-        // Quick ping — give cloud providers 60s and local runners 2 min,
-        // long enough for a cold model load without making the user wait forever.
-        { temperature: 0, timeoutMs: baseUrl.trim() ? 120_000 : 60_000 },
+        { temperature: 0 },
       );
       const elapsedMs = Math.round(performance.now() - startedAt);
       setTest({ status: "ok", modelEcho: result.model, elapsedMs });

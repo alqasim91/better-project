@@ -35,36 +35,20 @@ export interface ChatResult {
   tokensUsed: number;
 }
 
-// Cloud APIs (OpenAI, Anthropic, Gemini) finish within seconds. Local
-// runners (LM Studio, Ollama, llama.cpp) generating a full charter can
-// easily take 1–3 minutes — so when a custom base URL is set, give the
-// request a generous 5-minute ceiling instead of the cloud default.
-const TIMEOUT_CLOUD_MS = 60_000;
-const TIMEOUT_LOCAL_MS = 300_000;
-
-interface CompletionOptions {
-  temperature?: number;
-  /** Override the network timeout. Used by "Test connection" for fast feedback. */
-  timeoutMs?: number;
-}
-
-function defaultTimeoutFor(cfg: ByokConfig): number {
-  return cfg.baseUrl?.trim() ? TIMEOUT_LOCAL_MS : TIMEOUT_CLOUD_MS;
-}
+const TIMEOUT_MS = 60_000;
 
 export async function clientChatCompletion(
   cfg: ByokConfig,
   messages: ChatMessage[],
-  options: CompletionOptions = {},
+  options: { temperature?: number } = {},
 ): Promise<ChatResult> {
-  const timeoutMs = options.timeoutMs ?? defaultTimeoutFor(cfg);
   switch (cfg.provider) {
     case "gemini":
-      return geminiChat(cfg, messages, options, timeoutMs);
+      return geminiChat(cfg, messages, options);
     case "openai":
-      return openaiChat(cfg, messages, options, timeoutMs);
+      return openaiChat(cfg, messages, options);
     case "anthropic":
-      return anthropicChat(cfg, messages, options, timeoutMs);
+      return anthropicChat(cfg, messages, options);
     default:
       throw new Error(`Unknown provider: ${cfg.provider}`);
   }
@@ -74,7 +58,6 @@ async function geminiChat(
   cfg: ByokConfig,
   messages: ChatMessage[],
   options: { temperature?: number },
-  timeoutMs: number,
 ): Promise<ChatResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
 
@@ -95,7 +78,7 @@ async function geminiChat(
     body.systemInstruction = { parts: [{ text: systemMsg.content }] };
   }
 
-  const json = await postJson(url, body, {}, timeoutMs);
+  const json = await postJson(url, body, {});
   const text: string =
     (json as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })
       .candidates?.[0]?.content?.parts?.[0]?.text ?? "";
@@ -109,7 +92,6 @@ async function openaiChat(
   cfg: ByokConfig,
   messages: ChatMessage[],
   options: { temperature?: number },
-  timeoutMs: number,
 ): Promise<ChatResult> {
   const customBase = Boolean(cfg.baseUrl?.trim());
   const base = (cfg.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
@@ -128,12 +110,9 @@ async function openaiChat(
     body.response_format = { type: "json_object" };
   }
 
-  const json = await postJson(
-    url,
-    body,
-    { Authorization: `Bearer ${cfg.apiKey}` },
-    timeoutMs,
-  );
+  const json = await postJson(url, body, {
+    Authorization: `Bearer ${cfg.apiKey}`,
+  });
 
   const text: string =
     (json as { choices?: Array<{ message?: { content?: string } }> })
@@ -147,7 +126,6 @@ async function anthropicChat(
   cfg: ByokConfig,
   messages: ChatMessage[],
   options: { temperature?: number },
-  timeoutMs: number,
 ): Promise<ChatResult> {
   const url = "https://api.anthropic.com/v1/messages";
 
@@ -164,16 +142,11 @@ async function anthropicChat(
   };
   if (systemMsg) body.system = systemMsg.content;
 
-  const json = await postJson(
-    url,
-    body,
-    {
-      "x-api-key": cfg.apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    timeoutMs,
-  );
+  const json = await postJson(url, body, {
+    "x-api-key": cfg.apiKey,
+    "anthropic-version": "2023-06-01",
+    "anthropic-dangerous-direct-browser-access": "true",
+  });
 
   const blocks =
     (json as { content?: Array<{ type?: string; text?: string }> }).content ?? [];
@@ -190,10 +163,9 @@ async function postJson(
   url: string,
   body: unknown,
   extraHeaders: Record<string, string>,
-  timeoutMs: number,
 ): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -210,7 +182,7 @@ async function postJson(
     return await res.json();
   } catch (err) {
     if ((err as Error).name === "AbortError") {
-      throw new Error(`Request timed out after ${timeoutMs / 1000}s.`);
+      throw new Error(`Request timed out after ${TIMEOUT_MS / 1000}s.`);
     }
     throw err;
   } finally {
