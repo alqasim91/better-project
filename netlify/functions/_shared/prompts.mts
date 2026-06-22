@@ -18,7 +18,27 @@ Data shapes:
 - scope: { inScope:string[], outOfScope:string[], constraints:[{description,type}] }
 - risks: { risks:[{description,probability,impact,mitigation}], assumptions:string[], dependencies:string[] }
 - deliverables: { deliverables:[{name,description,acceptanceCriteria,dueDate}] }
-- timeline: { milestones:[{title,date,type}], totalBudget:number, currency, budgetNotes }`;
+- timeline: { milestones:[{title,date,type}], totalBudget:number, currency, budgetNotes }
+The "summary" of each section is ONE plain sentence on what you drafted/refined — no methodology commentary.`;
+
+// Volume guardrails for cold-start generation. Without these the model fills
+// every array with 7-10 items and invents stakeholders the user never named.
+const COLD_START_VOLUME_RULES = [
+  "KEEP THE CHARTER FOCUSED — volume rules (this matters):",
+  "- Every list (objectives, successCriteria, stakeholders, inScope, outOfScope, constraints, risks, assumptions, dependencies, deliverables, milestones) must contain AT MOST 3-5 items. Pick only the most important, highest-impact ones. Never pad a list to look thorough.",
+  "- Do NOT invent stakeholders, people, teams, vendors, or named entities the user did not mention. Use the stakeholders the user named, plus at most 1-2 additional roles, and only if one is genuinely essential to the project.",
+  "- Prefer fewer, stronger, specific items over many generic ones. Quality over quantity.",
+  '- Each section "summary" is ONE plain sentence stating what you drafted or inferred. Do not narrate your methodology or note that something is "typical" or "based on standard structures".',
+].join("\n");
+
+// Lighter volume guidance for the refine path: never cap or delete the user's
+// own items — only stop over-expansion of empty sections and invented entities.
+const REFINE_VOLUME_RULES = [
+  "KEEP IT FOCUSED:",
+  "- When filling empty fields or expanding thin lists, add only what's essential — do not pad a list beyond about 5 items. Never remove or shorten items the user already entered.",
+  "- Never invent named people, vendors, teams, or stakeholders the user did not mention.",
+  '- Each section "summary" is ONE plain sentence. No methodology narration.',
+].join("\n");
 
 function hasMeaningfulContent(charter: unknown): boolean {
   if (!charter || typeof charter !== "object") return false;
@@ -140,6 +160,7 @@ export function buildGenerationPrompt(
       "4. EXPAND short lists (objectives, stakeholders, risks, etc.) with additional plausible items only if the list looks too thin, marking the addition's reasoning in the section summary.",
       "5. Never invent specific named people, vendors, or precise financial figures.",
       "6. Use ISO 8601 dates and conservative estimates.",
+      REFINE_VOLUME_RULES,
       OUTPUT_CONTRACT,
     ].join("\n\n");
 
@@ -168,6 +189,7 @@ export function buildGenerationPrompt(
     `Today's date is ${today}. All generated dates MUST be today or in the future — never in the past. Default the project start date to today unless the user specifies otherwise.`,
     "Extrapolate sensible, industry-appropriate detail from sparse inputs, but never invent specific people, vendors, or figures that imply false precision.",
     "Use ISO 8601 dates and conservative estimates.",
+    COLD_START_VOLUME_RULES,
     OUTPUT_CONTRACT,
   ].join("\n\n");
 
@@ -178,7 +200,7 @@ export function buildGenerationPrompt(
     inputs.industry ? `Industry: ${inputs.industry}` : null,
     templateContext ? `Template context: ${templateContext}` : null,
     "",
-    "Draft every section. Note extrapolation assumptions in each section summary.",
+    "Draft every section. Keep each list to the few most important items (3-5 max) and do not invent stakeholders or entities beyond what's given.",
   ]
     .filter(Boolean)
     .join("\n");

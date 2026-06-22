@@ -44,7 +44,7 @@ const GENERATION_OUTPUT_CONTRACT = `Return ONLY valid JSON of the form:
     {
       "sectionId": "basics" | "goals" | "stakeholders" | "scope" | "risks" | "deliverables" | "timeline",
       "title": string,
-      "summary": string,            // one sentence describing what you inferred or refined
+      "summary": string,            // ONE plain sentence on what you drafted/refined — no methodology commentary
       "data": object                // fields matching that charter section
     }
   ]
@@ -58,6 +58,31 @@ Data shapes per sectionId:
 - deliverables: { deliverables: [{ name, description, acceptanceCriteria, dueDate (ISO) }] }
 - timeline: { milestones: [{ title, date (ISO), type: "milestone"|"deliverable"|"review" }], totalBudget: number, currency, budgetNotes }
 Do not include markdown fences or commentary outside the JSON.`;
+
+/**
+ * Volume guardrails for cold-start generation. Without these the model fills
+ * every array with 7-10 items and invents stakeholders the user never named,
+ * producing an overwhelming first draft. Keep lists short and grounded.
+ */
+const COLD_START_VOLUME_RULES = [
+  "KEEP THE CHARTER FOCUSED — volume rules (this matters):",
+  "- Every list (objectives, successCriteria, stakeholders, inScope, outOfScope, constraints, risks, assumptions, dependencies, deliverables, milestones) must contain AT MOST 3-5 items. Pick only the most important, highest-impact ones. Never pad a list to look thorough.",
+  "- Do NOT invent stakeholders, people, teams, vendors, or named entities the user did not mention. Use the stakeholders the user named, plus at most 1-2 additional roles, and only if one is genuinely essential to the project.",
+  "- Prefer fewer, stronger, specific items over many generic ones. Quality over quantity.",
+  '- Each section "summary" is ONE plain sentence stating what you drafted or inferred. Do not narrate your methodology or note that something is "typical" or "based on standard structures".',
+].join("\n");
+
+/**
+ * Lighter volume guidance for the refine path. The user may already have long
+ * lists on purpose, so we never cap or delete their items — we only stop the
+ * model from over-expanding empty sections or inventing entities.
+ */
+const REFINE_VOLUME_RULES = [
+  "KEEP IT FOCUSED:",
+  "- When filling empty fields or expanding thin lists, add only what's essential — do not pad a list beyond about 5 items. Never remove or shorten items the user already entered.",
+  "- Never invent named people, vendors, teams, or stakeholders the user did not mention.",
+  '- Each section "summary" is ONE plain sentence. No methodology narration.',
+].join("\n");
 
 function hasMeaningfulContent(charter?: Charter): boolean {
   if (!charter) return false;
@@ -142,6 +167,7 @@ export function buildGenerationPrompt(
       "4. EXPAND short lists with additional plausible items only if the list looks too thin, noting the addition's reasoning in the section summary.",
       "5. Never invent specific named people, vendors, or precise financial figures.",
       "6. Use ISO 8601 dates and conservative estimates.",
+      REFINE_VOLUME_RULES,
       GENERATION_OUTPUT_CONTRACT,
     ].join("\n\n");
 
@@ -156,7 +182,7 @@ export function buildGenerationPrompt(
       minimalInputs.industry ? `- Industry: ${minimalInputs.industry}` : null,
       templateContext ? `- Template context: ${templateContext}` : null,
       "",
-      "Return the FULL refined charter, all seven sections. Each section summary should briefly note what you refined vs. filled in.",
+      "Return the FULL refined charter, all seven sections. Each section summary is one plain sentence noting what you refined vs. filled in.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -169,6 +195,7 @@ export function buildGenerationPrompt(
     `Today's date is ${today}. All generated dates MUST be today or in the future — never in the past. Default the project start date to today unless the user specifies otherwise.`,
     "Extrapolate sensible, industry-appropriate detail from sparse inputs, but never invent specific people, vendors, or figures that imply false precision.",
     "Prefer ISO 8601 dates and conservative, defensible estimates.",
+    COLD_START_VOLUME_RULES,
     GENERATION_OUTPUT_CONTRACT,
   ].join("\n\n");
 
@@ -179,7 +206,7 @@ export function buildGenerationPrompt(
     minimalInputs.industry ? `Industry: ${minimalInputs.industry}` : null,
     templateContext ? `Template context: ${templateContext}` : null,
     "",
-    "Draft every section of the charter. Where you extrapolate beyond the inputs, keep it plausible and note the assumption in the section summary.",
+    "Draft every section of the charter. Keep each list to the few most important items (3-5 max) and do not invent stakeholders or entities beyond what's given.",
   ]
     .filter(Boolean)
     .join("\n");
